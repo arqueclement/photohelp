@@ -1,198 +1,113 @@
-const startCameraButton = document.querySelector("#startCamera");
-const takePhotoButton = document.querySelector("#takePhoto");
-const downloadPhotoButton = document.querySelector("#downloadPhoto");
-const printPhotoButton = document.querySelector("#printPhoto");
-const emailPhotoButton = document.querySelector("#emailPhoto");
-const fileInput = document.querySelector("#fileInput");
-const video = document.querySelector("#cameraPreview");
-const canvas = document.querySelector("#photoCanvas");
-const photoPreview = document.querySelector("#photoPreview");
-const emptyState = document.querySelector("#emptyState");
-const sendForm = document.querySelector("#sendForm");
-const emailInput = document.querySelector("#emailInput");
-const courseInput = document.querySelector("#courseInput");
-const messageInput = document.querySelector("#messageInput");
-const statusMessage = document.querySelector("#statusMessage");
+const input = document.querySelector("#photos");
+const email = document.querySelector("#email");
+const subject = document.querySelector("#subject");
+const shareButton = document.querySelector("#share");
+const clearButton = document.querySelector("#clear");
+const preview = document.querySelector("#preview");
+const count = document.querySelector("#count");
+const statusText = document.querySelector("#status");
+const template = document.querySelector("#photo-card-template");
 
-let photoDataUrl = "";
+let photos = [];
+let nextId = 1;
 
-function setStatus(message) {
-  statusMessage.textContent = message;
+function updateStatus() {
+  const total = photos.length;
+  count.textContent = String(total);
+  shareButton.disabled = total === 0;
+  clearButton.disabled = total === 0;
+  statusText.textContent = total === 0
+    ? "Aucune photo ajoutee pour le moment."
+    : `${total} page${total > 1 ? "s" : ""} prete${total > 1 ? "s" : ""} a envoyer.`;
 }
 
-function setPhoto(dataUrl) {
-  photoDataUrl = dataUrl;
-  photoPreview.src = dataUrl;
-  photoPreview.hidden = false;
-  emptyState.hidden = true;
-  video.hidden = true;
-  downloadPhotoButton.disabled = false;
-  printPhotoButton.disabled = false;
-  emailPhotoButton.disabled = false;
-  setStatus("Photo ajoutee. Vous pouvez telecharger, imprimer ou envoyer l'email.");
-}
+function renderPhotos() {
+  preview.innerHTML = "";
 
-function getFileName() {
-  const course = courseInput.value.trim().replace(/[^a-z0-9-]+/gi, "-") || "cours";
-  return `${course}-photo.png`;
-}
+  photos.forEach((photo, index) => {
+    const card = template.content.firstElementChild.cloneNode(true);
+    const image = card.querySelector("img");
+    const label = card.querySelector("span");
+    const remove = card.querySelector("button");
 
-function dataUrlToFile(dataUrl, fileName) {
-  const [header, base64] = dataUrl.split(",");
-  const mime = header.match(/:(.*?);/)?.[1] || "image/png";
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return new File([bytes], fileName, { type: mime });
-}
-
-async function startCamera() {
-  try {
-    const cameraStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: "environment" } },
-      audio: false
+    image.src = URL.createObjectURL(photo.file);
+    image.alt = `Page ${index + 1}`;
+    image.onload = () => URL.revokeObjectURL(image.src);
+    label.textContent = `Page ${index + 1}`;
+    remove.addEventListener("click", () => {
+      photos = photos.filter((item) => item.id !== photo.id);
+      renderPhotos();
     });
 
-    video.srcObject = cameraStream;
-    video.hidden = false;
-    photoPreview.hidden = true;
-    emptyState.hidden = true;
-    takePhotoButton.disabled = false;
-    setStatus("Camera ouverte. Cadrez la feuille puis prenez la photo.");
-  } catch (error) {
-    setStatus("Impossible d'ouvrir la camera. Vous pouvez choisir une photo depuis le telephone.");
-  }
-}
-
-function takePhoto() {
-  const width = video.videoWidth;
-  const height = video.videoHeight;
-
-  if (!width || !height) {
-    setStatus("La camera n'est pas encore prete. Reessayez dans une seconde.");
-    return;
-  }
-
-  canvas.width = width;
-  canvas.height = height;
-  canvas.getContext("2d").drawImage(video, 0, 0, width, height);
-  setPhoto(canvas.toDataURL("image/png", 0.95));
-}
-
-function downloadPhoto() {
-  if (!photoDataUrl) return;
-
-  const link = document.createElement("a");
-  link.href = photoDataUrl;
-  link.download = getFileName();
-  link.click();
-}
-
-function printPhoto() {
-  if (!photoDataUrl) return;
-
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    setStatus("Autorisez les fenetres pop-up pour imprimer la photo.");
-    return;
-  }
-
-  printWindow.document.write(`
-    <!doctype html>
-    <html lang="fr">
-      <head>
-        <title>Impression du cours</title>
-        <style>
-          body { margin: 0; display: grid; min-height: 100vh; place-items: center; }
-          img { max-width: 100%; max-height: 100vh; object-fit: contain; }
-        </style>
-      </head>
-      <body>
-        <img src="${photoDataUrl}" alt="Photo du cours">
-        <script>
-          window.onload = () => window.print();
-        <\/script>
-      </body>
-    </html>
-  `);
-  printWindow.document.close();
-}
-
-async function sendEmail(event) {
-  event.preventDefault();
-
-  if (!photoDataUrl) {
-    setStatus("Ajoutez une photo avant d'envoyer l'email.");
-    return;
-  }
-
-  const email = emailInput.value.trim();
-  if (!emailInput.checkValidity()) {
-    setStatus("Entrez une adresse email valide.");
-    emailInput.focus();
-    return;
-  }
-
-  const file = dataUrlToFile(photoDataUrl, getFileName());
-  const message = messageInput.value.trim();
-
-  setStatus("Envoi de l'email en cours...");
-  emailPhotoButton.disabled = true;
-
-  try {
-    const formData = new FormData();
-    formData.append("email", email);
-    formData.append("course", courseInput.value.trim());
-    formData.append("message", message);
-    formData.append("photo", file);
-
-    const response = await fetch("/api/send", {
-      method: "POST",
-      body: formData
-    });
-
-    if (response.ok) {
-      setStatus("Email envoye directement. Vous pouvez maintenant l'imprimer depuis votre boite mail.");
-      return;
-    }
-
-    const result = await response.json().catch(() => ({}));
-    const errorText = result.detail || result.error || `Erreur ${response.status}`;
-    setStatus(`Envoi direct bloque: ${errorText}`);
-  } catch (error) {
-    setStatus("Envoi direct impossible: verifiez que le site est bien sur Cloudflare Pages avec le dossier functions.");
-  } finally {
-    emailPhotoButton.disabled = false;
-  }
-}
-
-function handleFile(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = () => setPhoto(reader.result);
-  reader.readAsDataURL(file);
-}
-
-startCameraButton.addEventListener("click", startCamera);
-takePhotoButton.addEventListener("click", takePhoto);
-downloadPhotoButton.addEventListener("click", downloadPhoto);
-printPhotoButton.addEventListener("click", printPhoto);
-sendForm.addEventListener("submit", sendEmail);
-fileInput.addEventListener("change", handleFile);
-
-if (!navigator.mediaDevices?.getUserMedia) {
-  startCameraButton.disabled = true;
-  setStatus("Votre navigateur ne permet pas l'ouverture directe de la camera. Choisissez une photo.");
-}
-
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("service-worker.js").catch(() => {});
+    preview.append(card);
   });
+
+  updateStatus();
 }
+
+function addPhotos(files) {
+  const imageFiles = [...files].filter((file) => file.type.startsWith("image/"));
+  const newPhotos = imageFiles.map((file) => ({
+    id: `${Date.now()}-${nextId++}-${file.name}-${file.size}`,
+    file,
+  }));
+
+  photos = [...photos, ...newPhotos];
+  renderPhotos();
+  input.value = "";
+}
+
+async function sharePhotos() {
+  if (photos.length === 0) return;
+
+  const recipient = email.value.trim();
+  const mailSubject = subject.value.trim() || "Mes cours a imprimer";
+  const files = photos.map((photo, index) => {
+    const extension = photo.file.name.split(".").pop() || "jpg";
+    return new File([photo.file], `cours-page-${index + 1}.${extension}`, {
+      type: photo.file.type || "image/jpeg",
+    });
+  });
+
+  const shareData = {
+    title: mailSubject,
+    text: recipient
+      ? `A envoyer a : ${recipient}\n\nVoici mes cours a imprimer.`
+      : "Voici mes cours a imprimer.",
+    files,
+  };
+
+  if (navigator.canShare && navigator.canShare({ files })) {
+    try {
+      await navigator.share(shareData);
+      statusText.textContent = "Partage ouvert. Choisis ton application email pour envoyer les photos.";
+      return;
+    } catch (error) {
+      if (error.name === "AbortError") return;
+    }
+  }
+
+  files.forEach((file) => {
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(file);
+    link.download = file.name;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  });
+
+  const body = encodeURIComponent(
+    "Les photos viennent d'etre telechargees. Ajoute-les en pieces jointes avant d'envoyer le message."
+  );
+  const url = `mailto:${encodeURIComponent(recipient)}?subject=${encodeURIComponent(mailSubject)}&body=${body}`;
+  window.location.href = url;
+  statusText.textContent = "Les photos ont ete telechargees. Ajoute-les au mail si ton telephone ne l'a pas fait automatiquement.";
+}
+
+input.addEventListener("change", (event) => addPhotos(event.target.files));
+shareButton.addEventListener("click", sharePhotos);
+clearButton.addEventListener("click", () => {
+  photos = [];
+  renderPhotos();
+});
+
+updateStatus();
