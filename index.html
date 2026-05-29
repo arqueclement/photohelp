@@ -43,7 +43,7 @@
         <div class="capture-panel">
           <div class="panel-heading">
             <h2>Photo du cours</h2>
-            <p id="photoState">Aucune photo</p>
+            <p id="photoState">Aucune photo - limite 20 MB</p>
           </div>
           <div class="camera-frame">
             <video id="cameraPreview" autoplay playsinline muted hidden></video>
@@ -51,16 +51,17 @@
             <img id="photoPreview" alt="Apercu de la photo du cours" hidden>
             <div id="emptyState" class="empty-state">
               <span class="camera-icon" aria-hidden="true"></span>
-              <p>Ouvrez la camera ou choisissez une photo deja prise.</p>
+              <p>Ouvrez la camera ou choisissez des photos deja prises.</p>
             </div>
           </div>
+          <div id="photoList" class="photo-list" hidden></div>
 
           <div class="toolbar" aria-label="Actions photo">
             <button id="startCamera" class="button button--camera" type="button">Camera</button>
-            <button id="takePhoto" class="button button--shot" type="button" disabled>Photo</button>
+            <button id="takePhoto" class="button button--shot" type="button" disabled>Ajouter photo</button>
             <label class="button file-button button--file">
               Galerie
-              <input id="fileInput" type="file" accept="image/*" capture="environment">
+              <input id="fileInput" type="file" accept="image/*" multiple>
             </label>
           </div>
         </div>
@@ -90,11 +91,11 @@
             <button id="sharePhoto" class="button button--share" type="button" disabled>Partager</button>
             <button id="downloadPhoto" class="button button--download" type="button" disabled>Telecharger</button>
             <button id="printPhoto" class="button button--print" type="button" disabled>Imprimer</button>
-            <button id="emailPhoto" class="button button--send" type="submit" disabled>Envoyer</button>
+            <button id="emailPhoto" class="button button--send" type="submit" disabled>Envoyer par mail</button>
           </div>
 
           <p id="statusMessage" class="status" role="status">
-            Ajoutez une photo pour activer l'envoi.
+            Ajoutez une photo pour activer l'envoi par mail.
           </p>
         </form>
       </section>
