@@ -142,6 +142,20 @@ async function sharePhoto() {
   }
 }
 
+function getFriendlySendError(result, status) {
+  const rawMessage = `${result?.message || ""} ${result?.detail || ""} ${result?.error || ""}`.toLowerCase();
+
+  if (status === 403 || rawMessage.includes("testing emails") || rawMessage.includes("verify a domain")) {
+    return "Envoi direct bloque par le service mail. Touchez Partager, choisissez votre application mail, puis envoyez la photo.";
+  }
+
+  if (status === 500) {
+    return "L'envoi direct n'est pas encore configure. Utilisez Partager ou Telecharger pour envoyer la photo.";
+  }
+
+  return "Envoi direct impossible pour le moment. Utilisez Partager ou Telecharger pour envoyer la photo.";
+}
+
 function printPhoto() {
   if (!photoDataUrl) return;
 
@@ -211,10 +225,9 @@ async function sendEmail(event) {
     }
 
     const result = await response.json().catch(() => ({}));
-    const errorText = result.detail || result.error || `Erreur ${response.status}`;
-    setStatus(`Envoi direct bloque: ${errorText}`);
+    setStatus(getFriendlySendError(result, response.status));
   } catch (error) {
-    setStatus("Envoi direct impossible: verifiez que le site est bien sur Cloudflare Pages avec le dossier functions.");
+    setStatus("Envoi direct impossible pour le moment. Utilisez Partager ou Telecharger pour envoyer la photo.");
   } finally {
     emailPhotoButton.disabled = false;
   }

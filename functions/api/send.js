@@ -43,7 +43,14 @@ export async function onRequestPost({ request, env }) {
 
     if (!response.ok) {
       const detail = await response.text();
-      return json({ error: "Email provider failed.", detail }, 502);
+      if (detail.toLowerCase().includes("testing emails") || detail.toLowerCase().includes("verify a domain")) {
+        return json({
+          error: "Envoi direct bloque par le service mail.",
+          message: "Utilisez Partager ou Telecharger pour envoyer la photo."
+        }, 403);
+      }
+
+      return json({ error: "L'envoi direct a echoue." }, 502);
     }
 
     return json({ ok: true });
