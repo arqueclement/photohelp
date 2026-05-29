@@ -17,7 +17,7 @@ const messageInput = document.querySelector("#messageInput");
 const statusMessage = document.querySelector("#statusMessage");
 const photoState = document.querySelector("#photoState");
 
-const MAX_TOTAL_BYTES = 20 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 18 * 1024 * 1024;
 
 let photos = [];
 let cameraStream = null;
@@ -297,9 +297,14 @@ async function sendEmail(event) {
     mailto.searchParams.set("subject", subject);
     mailto.searchParams.set("body", `${body}\n\nLes photos ont ete telechargees. Ajoutez-les en pieces jointes avant d'envoyer.`);
     window.location.href = mailto.toString();
-    setStatus("Les photos ont ete telechargees. Ajoutez-les en pieces jointes dans votre mail.");
+    setStatus("Sur ordinateur, les photos sont telechargees. Ajoutez-les en pieces jointes dans votre mail.");
   } catch (error) {
-    setStatus("Partage annule. Vous pouvez recommencer avec Envoyer ou utiliser Telecharger.");
+    if (error.name === "AbortError") {
+      setStatus("Partage ferme sans envoi. Sur telephone, choisissez Gmail ou Mail. Sur ordinateur, utilisez Telecharger.");
+      return;
+    }
+
+    setStatus("Partage impossible ici. Sur ordinateur, utilisez Telecharger puis ajoutez les photos au mail.");
   } finally {
     emailPhotoButton.disabled = false;
   }
