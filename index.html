@@ -3,68 +3,102 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#235f61">
-    <title>PhotoCours - Envoyer ses cours</title>
+    <meta name="theme-color" content="#1f7a5a">
+    <title>PhotoCours - cours vers email</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icons/icon-192.svg">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <main class="app-shell">
-      <section class="hero" aria-labelledby="title">
-        <div class="hero__content">
+    <main class="app">
+      <section class="hero">
+        <div class="hero__copy">
           <p class="eyebrow">Aide PAP / PPS</p>
-          <h1 id="title">PhotoCours</h1>
-          <p class="intro">
-            Prends en photo tes cours avec ton telephone, verifie les pages, puis partage-les par email pour les imprimer ou les photocopier.
+          <h1>PhotoCours</h1>
+          <p>
+            Prenez une photo d'un cours avec le telephone, envoyez-la par email,
+            puis imprimez-la ou photocopiez-la facilement.
           </p>
+          <ol class="steps" aria-label="Etapes">
+            <li>Photo</li>
+            <li>Email</li>
+            <li>Impression</li>
+          </ol>
+        </div>
+        <div class="hero__phone" aria-hidden="true">
+          <div class="phone">
+            <div class="phone__camera"></div>
+            <div class="phone__sheet">
+              <span></span>
+              <span></span>
+              <span></span>
+              <strong>A4</strong>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section class="tool" aria-label="Outil d'envoi de cours">
-        <div class="field-group">
-          <label for="email">Email du destinataire</label>
-          <input id="email" type="email" inputmode="email" autocomplete="email" placeholder="exemple@email.com">
+      <section class="workspace" aria-label="Envoyer une photo de cours">
+        <div class="capture-panel">
+          <div class="panel-heading">
+            <h2>Photo du cours</h2>
+            <p id="photoState">Aucune photo</p>
+          </div>
+          <div class="camera-frame">
+            <video id="cameraPreview" autoplay playsinline muted hidden></video>
+            <canvas id="photoCanvas" hidden></canvas>
+            <img id="photoPreview" alt="Apercu de la photo du cours" hidden>
+            <div id="emptyState" class="empty-state">
+              <span class="camera-icon" aria-hidden="true"></span>
+              <p>Ouvrez la camera ou choisissez une photo deja prise.</p>
+            </div>
+          </div>
+
+          <div class="toolbar" aria-label="Actions photo">
+            <button id="startCamera" class="button button--camera" type="button">Camera</button>
+            <button id="takePhoto" class="button button--shot" type="button" disabled>Photo</button>
+            <label class="button file-button button--file">
+              Galerie
+              <input id="fileInput" type="file" accept="image/*" capture="environment">
+            </label>
+          </div>
         </div>
 
-        <div class="field-group">
-          <label for="subject">Objet du mail</label>
-          <input id="subject" type="text" value="Mes cours a imprimer">
-        </div>
+        <form id="sendForm" class="send-panel">
+          <div class="panel-heading">
+            <h2>Envoi</h2>
+            <p>Mail et impression</p>
+          </div>
 
-        <div class="capture-zone">
-          <input id="photos" class="file-input" type="file" accept="image/*" capture="environment" multiple>
-          <label class="capture-button" for="photos">
-            <span class="capture-button__icon" aria-hidden="true">+</span>
-            <span>Prendre ou ajouter des photos</span>
+          <label>
+            Email de reception
+            <input id="emailInput" type="email" placeholder="exemple@email.com" required>
           </label>
-          <p class="hint">Tu peux ajouter plusieurs pages avant l'envoi.</p>
-        </div>
 
-        <div class="actions">
-          <button id="share" class="primary" type="button" disabled>Envoyer par email</button>
-          <button id="clear" class="secondary" type="button" disabled>Tout effacer</button>
-        </div>
+          <label>
+            Nom du cours
+            <input id="courseInput" type="text" placeholder="Maths, histoire, SVT...">
+          </label>
 
-        <p id="status" class="status" role="status">Aucune photo ajoutee pour le moment.</p>
-      </section>
+          <label>
+            Message
+            <textarea id="messageInput" rows="4">Bonjour, voici la photo de mon cours a imprimer.</textarea>
+          </label>
 
-      <section class="preview-section" aria-labelledby="preview-title">
-        <div class="section-heading">
-          <h2 id="preview-title">Pages ajoutees</h2>
-          <span id="count" class="count">0</span>
-        </div>
-        <div id="preview" class="preview-grid"></div>
+          <div class="actions">
+            <button id="sharePhoto" class="button button--share" type="button" disabled>Partager</button>
+            <button id="downloadPhoto" class="button button--download" type="button" disabled>Telecharger</button>
+            <button id="printPhoto" class="button button--print" type="button" disabled>Imprimer</button>
+            <button id="emailPhoto" class="button button--send" type="submit" disabled>Envoyer</button>
+          </div>
+
+          <p id="statusMessage" class="status" role="status">
+            Ajoutez une photo pour activer l'envoi.
+          </p>
+        </form>
       </section>
     </main>
-
-    <template id="photo-card-template">
-      <article class="photo-card">
-        <img alt="">
-        <div class="photo-card__bar">
-          <span></span>
-          <button type="button">Supprimer</button>
-        </div>
-      </article>
-    </template>
 
     <script src="app.js"></script>
   </body>
