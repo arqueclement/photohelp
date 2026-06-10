@@ -122,7 +122,7 @@
 
           <label>
             De la part de
-            <input id="senderInput" type="email" placeholder="Connectez-vous pour remplir automatiquement">
+            <input id="senderInput" type="text" placeholder="Connectez-vous pour remplir automatiquement">
           </label>
 
           <label>
@@ -143,6 +143,11 @@
         </form>
       </section>
     </main>
+
+    <dialog id="photoDialog" class="photo-dialog">
+      <button id="closePhotoDialog" class="photo-dialog-close" type="button">fermer</button>
+      <img id="dialogPhoto" alt="Photo selectionnee">
+    </dialog>
 
     <script src="app.js"></script>
   </body>

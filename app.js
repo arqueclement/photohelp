@@ -33,6 +33,9 @@ const loginPseudoInput = document.querySelector("#loginPseudo");
 const loginEmailInput = document.querySelector("#loginEmail");
 const loginCodeInput = document.querySelector("#loginCode");
 const loginMessage = document.querySelector("#loginMessage");
+const photoDialog = document.querySelector("#photoDialog");
+const dialogPhoto = document.querySelector("#dialogPhoto");
+const closePhotoDialogButton = document.querySelector("#closePhotoDialog");
 
 const MAX_TOTAL_BYTES = 18 * 1024 * 1024;
 const ACCOUNTS_KEY = "photocours-accounts";
@@ -261,12 +264,27 @@ function createPhotoCards(items, label) {
   }
 
   return items.map((photo, index) => `
-    <article class="folder-photo-card">
+    <button class="folder-photo-card" type="button" data-photo-src="${photo.dataUrl}">
       <img src="${photo.dataUrl}" alt="${label} ${index + 1}">
       <strong>${label}</strong>
       <span>${formatBytes(photo.size)}</span>
-    </article>
+    </button>
   `).join("");
+}
+
+function openPhotoDialog(src) {
+  dialogPhoto.src = src;
+  if (photoDialog.showModal) {
+    photoDialog.showModal();
+    return;
+  }
+
+  photoDialog.setAttribute("open", "");
+}
+
+function closePhotoDialog() {
+  photoDialog.close?.();
+  photoDialog.removeAttribute("open");
 }
 
 function openFolderView(view) {
@@ -601,6 +619,12 @@ downloadPhotoButton.addEventListener("click", downloadPhoto);
 printPhotoButton.addEventListener("click", printPhoto);
 sendForm.addEventListener("submit", sendEmail);
 fileInput.addEventListener("change", handleFile);
+folderContent.addEventListener("click", (event) => {
+  const card = event.target.closest(".folder-photo-card");
+  if (!card) return;
+  openPhotoDialog(card.dataset.photoSrc);
+});
+closePhotoDialogButton.addEventListener("click", closePhotoDialog);
 
 quickReceivedButton.addEventListener("click", () => {
   openFolderView("received");
