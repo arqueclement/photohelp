@@ -328,8 +328,9 @@ function rememberSentPhotos(recipient) {
   if (!photos.length) return;
 
   const sentAt = new Date().toISOString();
+  const senderEmail = getCurrentEmail();
   sentPhotos = [
-    ...photos.map((photo) => ({ ...photo, sender: getSenderName(), recipient, sentAt })),
+    ...photos.map((photo) => ({ ...photo, sender: getSenderName(), senderEmail, recipient, sentAt })),
     ...sentPhotos
   ];
 }
@@ -477,6 +478,17 @@ function getSenderName() {
   return senderInput.value.trim() || localStorage.getItem(SESSION_KEY) || "la personne connectee";
 }
 
+function getCurrentEmail() {
+  return localStorage.getItem(SESSION_KEY) || "";
+}
+
+function getVisibleSentPhotos() {
+  const currentEmail = getCurrentEmail();
+  if (!currentEmail) return [];
+
+  return sentPhotos.filter((photo) => photo.senderEmail === currentEmail);
+}
+
 function getFolderInfo(view) {
   const displayName = getSenderName();
   const folders = {
@@ -490,7 +502,7 @@ function getFolderInfo(view) {
       title: "Envoyer",
       subtitle: "Photos que vous avez envoyees",
       label: `photo de ${displayName}`,
-      items: sentPhotos
+      items: getVisibleSentPhotos()
     },
     trash: {
       title: "Corbeille",
@@ -510,9 +522,10 @@ function getFolderInfo(view) {
 }
 
 function createFolderNav(view) {
+  const visibleSentPhotos = getVisibleSentPhotos();
   const folderItems = [
     ["received", "Recue", receivedPhotos.length],
-    ["send", "Envoyer", sentPhotos.length],
+    ["send", "Envoyer", visibleSentPhotos.length],
     ["trash", "Corbeille", deletedPhotos.length],
     ["photo", "Photo", photos.length]
   ];
@@ -607,7 +620,7 @@ async function deletePhotoFromServer(photo, permanent = false) {
 async function deletePhotoAt(view, index) {
   const folders = {
     received: receivedPhotos,
-    send: sentPhotos,
+    send: getVisibleSentPhotos(),
     trash: deletedPhotos,
     photo: photos
   };
@@ -623,7 +636,10 @@ async function deletePhotoAt(view, index) {
   }
 
   if (view === "send") {
-    sentPhotos.splice(index, 1);
+    const realIndex = sentPhotos.indexOf(photo);
+    if (realIndex >= 0) {
+      sentPhotos.splice(realIndex, 1);
+    }
     deletedPhotos = [{ ...photo, deletedAt: new Date().toISOString() }, ...deletedPhotos];
   }
 
