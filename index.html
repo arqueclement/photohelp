@@ -149,6 +149,23 @@
       <img id="dialogPhoto" alt="Photo selectionnee">
     </dialog>
 
+    <dialog id="printPickerDialog" class="print-picker">
+      <form method="dialog" class="print-picker-panel">
+        <header class="print-picker-header">
+          <div>
+            <h2>Imprimer</h2>
+            <p>Selectionnez les photos a imprimer.</p>
+          </div>
+          <button id="closePrintPicker" class="photo-dialog-close" type="button">fermer</button>
+        </header>
+        <div id="printPickerList" class="print-picker-list"></div>
+        <footer class="print-picker-footer">
+          <button id="selectAllPrintPhotos" class="button button--download" type="button">Tout selectionner</button>
+          <button id="printSelectedPhotos" class="button button--print" type="button">Imprimer</button>
+        </footer>
+      </form>
+    </dialog>
+
     <script src="app.js"></script>
   </body>
 </html>

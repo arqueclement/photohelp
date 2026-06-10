@@ -383,6 +383,28 @@ body.is-folder-open .login-open {
   font-size: 0.9rem;
 }
 
+.mailbox-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mailbox-print {
+  min-height: 2.25rem;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.45rem 0.8rem;
+  color: #fff;
+  background: var(--amber);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.mailbox-print:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .mailbox-rows {
   display: grid;
 }
@@ -390,7 +412,7 @@ body.is-folder-open .login-open {
 .mailbox-row {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 2.5rem;
+  grid-template-columns: minmax(0, 1fr) 5rem;
   align-items: center;
   min-height: 5.5rem;
   border-bottom: 1px solid var(--line);
@@ -455,11 +477,14 @@ body.is-folder-open .login-open {
 
 .mailbox-actions {
   position: relative;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
   padding-right: 0.5rem;
 }
 
+.mailbox-download,
 .mailbox-more {
   width: 2rem;
   height: 2rem;
@@ -472,6 +497,12 @@ body.is-folder-open .login-open {
   line-height: 1;
 }
 
+.mailbox-download {
+  font-size: 1.15rem;
+}
+
+.mailbox-download:hover,
+.mailbox-download:focus-visible,
 .mailbox-more:hover,
 .mailbox-more:focus-visible,
 .mailbox-actions.is-open .mailbox-more {
@@ -607,6 +638,112 @@ body.is-folder-open .login-open {
   color: var(--green-dark);
   background: #fff;
   cursor: pointer;
+  font-weight: 800;
+}
+
+.print-picker {
+  width: min(92vw, 52rem);
+  max-height: 88vh;
+  border: 0;
+  border-radius: 8px;
+  padding: 0;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.print-picker::backdrop {
+  background: rgba(12, 18, 28, 0.62);
+}
+
+.print-picker-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  max-height: 88vh;
+}
+
+.print-picker-header,
+.print-picker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.print-picker-footer {
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+}
+
+.print-picker-header h2,
+.print-picker-header p {
+  margin: 0;
+}
+
+.print-picker-header h2 {
+  font-size: 1.35rem;
+}
+
+.print-picker-header p {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.print-picker-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.8rem;
+  overflow: auto;
+  padding: 1rem;
+}
+
+.print-picker-item {
+  display: grid;
+  gap: 0.55rem;
+  align-content: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.65rem;
+  color: var(--ink);
+  background: #fff;
+  cursor: pointer;
+}
+
+.print-picker-item:has(input:checked) {
+  border-color: rgba(31, 122, 90, 0.55);
+  background: #f1fbf6;
+}
+
+.print-picker-item input {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.print-picker-item img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #101820;
+}
+
+.print-picker-item span {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.print-picker-item strong,
+.print-picker-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.print-picker-item small {
+  color: var(--muted);
   font-weight: 800;
 }
 

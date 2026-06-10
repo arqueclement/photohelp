@@ -36,6 +36,11 @@ const loginMessage = document.querySelector("#loginMessage");
 const photoDialog = document.querySelector("#photoDialog");
 const dialogPhoto = document.querySelector("#dialogPhoto");
 const closePhotoDialogButton = document.querySelector("#closePhotoDialog");
+const printPickerDialog = document.querySelector("#printPickerDialog");
+const printPickerList = document.querySelector("#printPickerList");
+const closePrintPickerButton = document.querySelector("#closePrintPicker");
+const selectAllPrintPhotosButton = document.querySelector("#selectAllPrintPhotos");
+const printSelectedPhotosButton = document.querySelector("#printSelectedPhotos");
 
 const MAX_TOTAL_BYTES = 18 * 1024 * 1024;
 const SERVER_SEND_LIMIT_BYTES = 5 * 1024 * 1024;
@@ -489,6 +494,17 @@ function getVisibleSentPhotos() {
   return sentPhotos.filter((photo) => photo.senderEmail === currentEmail);
 }
 
+function getFolderPhotos(view) {
+  const folders = {
+    received: receivedPhotos,
+    send: getVisibleSentPhotos(),
+    trash: deletedPhotos,
+    photo: photos
+  };
+
+  return folders[view] || [];
+}
+
 function getFolderInfo(view) {
   const displayName = getSenderName();
   const folders = {
@@ -546,6 +562,23 @@ function createFolderNav(view) {
   `;
 }
 
+function createPrintPickerItems(items) {
+  if (!items.length) {
+    return `<p class="folder-empty">Aucune photo a imprimer.</p>`;
+  }
+
+  return items.map((photo, index) => `
+    <label class="print-picker-item">
+      <input type="checkbox" value="${index}" checked>
+      <img src="${photo.dataUrl}" alt="Photo ${index + 1}">
+      <span>
+        <strong>${photo.course || `Photo ${index + 1}`}</strong>
+        <small>${formatBytes(photo.size)}</small>
+      </span>
+    </label>
+  `).join("");
+}
+
 function getCurrentDisplayPseudo() {
   return getCurrentPseudo() || "moi";
 }
@@ -561,6 +594,17 @@ function getPhotoRecipient(photo, view) {
   if (photo.recipientPseudo) return photo.recipientPseudo;
   if (view === "received") return getCurrentDisplayPseudo();
   return "inconnu";
+}
+
+function getMailboxDownloadName(photo, index) {
+  if (photo.fileName) return photo.fileName;
+
+  const course = (photo.course || courseInput.value.trim() || "photo")
+    .replace(/[^a-z0-9-]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+
+  return `${course || "photo"}-${index + 1}.png`;
 }
 
 function createMailboxRows(items, label, view) {
@@ -589,6 +633,7 @@ function createMailboxRows(items, label, view) {
           </span>
         </button>
         <span class="mailbox-actions">
+          <button class="mailbox-download" type="button" data-download-photo data-index="${index}" aria-label="Telecharger">&#8595;</button>
           <button class="mailbox-more" type="button" data-toggle-menu aria-label="Options">...</button>
           <span class="mailbox-menu">
             <button type="button" data-delete-photo data-folder="${view}" data-index="${index}">
@@ -599,6 +644,78 @@ function createMailboxRows(items, label, view) {
       </article>
     `;
   }).join("");
+}
+
+function downloadMailboxPhoto(view, index) {
+  const photo = getFolderPhotos(view)[index];
+  if (!photo) return;
+
+  const link = document.createElement("a");
+  link.href = photo.dataUrl;
+  link.download = getMailboxDownloadName(photo, index);
+  link.click();
+  setStatus("Photo telechargee.");
+}
+
+function openPrintPicker(view) {
+  const items = getFolderPhotos(view);
+  if (!items.length) {
+    setStatus("Aucune photo a imprimer dans cette categorie.");
+    return;
+  }
+
+  activeFolderView = view;
+  printPickerList.innerHTML = createPrintPickerItems(items);
+  if (printPickerDialog.showModal) {
+    printPickerDialog.showModal();
+    return;
+  }
+
+  printPickerDialog.setAttribute("open", "");
+}
+
+function closePrintPicker() {
+  printPickerDialog.close?.();
+  printPickerDialog.removeAttribute("open");
+}
+
+function printSelectedFolderPhotos() {
+  const selectedIndexes = Array.from(printPickerList.querySelectorAll("input:checked"))
+    .map((input) => Number(input.value));
+  const items = getFolderPhotos(activeFolderView);
+  const selectedPhotos = selectedIndexes.map((index) => items[index]).filter(Boolean);
+
+  if (!selectedPhotos.length) {
+    setStatus("Selectionnez au moins une photo a imprimer.");
+    return;
+  }
+
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    setStatus("Autorisez les fenetres pop-up pour imprimer.");
+    return;
+  }
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html lang="fr">
+      <head>
+        <title>Impression PhotoCours</title>
+        <style>
+          body { margin: 0; }
+          img { display: block; max-width: 100%; max-height: 100vh; margin: 0 auto; object-fit: contain; page-break-after: always; }
+        </style>
+      </head>
+      <body>
+        ${selectedPhotos.map((photo, index) => `<img src="${photo.dataUrl}" alt="Photo ${index + 1}">`).join("")}
+        <script>
+          window.onload = () => window.print();
+        <\/script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  closePrintPicker();
 }
 
 async function deletePhotoFromServer(photo, permanent = false) {
@@ -706,7 +823,10 @@ function openFolderView(view) {
           <h2>${info.title}</h2>
           <p>${info.subtitle}</p>
         </div>
-        <strong>${info.items.length} photo${info.items.length > 1 ? "s" : ""}</strong>
+        <div class="mailbox-header-actions">
+          <strong>${info.items.length} photo${info.items.length > 1 ? "s" : ""}</strong>
+          <button class="mailbox-print" type="button" data-print-folder="${view}" ${info.items.length ? "" : "disabled"}>Imprimer</button>
+        </div>
       </header>
       <div class="mailbox-rows">
         ${createMailboxRows(info.items, info.label, view)}
@@ -926,6 +1046,18 @@ printPhotoButton.addEventListener("click", printPhoto);
 sendForm.addEventListener("submit", sendEmail);
 fileInput.addEventListener("change", handleFile);
 folderContent.addEventListener("click", (event) => {
+  const printButton = event.target.closest("[data-print-folder]");
+  if (printButton) {
+    openPrintPicker(printButton.dataset.printFolder);
+    return;
+  }
+
+  const downloadButton = event.target.closest("[data-download-photo]");
+  if (downloadButton) {
+    downloadMailboxPhoto(activeFolderView, Number(downloadButton.dataset.index));
+    return;
+  }
+
   const deleteButton = event.target.closest("[data-delete-photo]");
   if (deleteButton) {
     deletePhotoAt(deleteButton.dataset.folder, Number(deleteButton.dataset.index));
@@ -946,6 +1078,13 @@ folderContent.addEventListener("click", (event) => {
   openPhotoDialog(card.dataset.photoSrc);
 });
 closePhotoDialogButton.addEventListener("click", closePhotoDialog);
+closePrintPickerButton.addEventListener("click", closePrintPicker);
+selectAllPrintPhotosButton.addEventListener("click", () => {
+  printPickerList.querySelectorAll("input[type='checkbox']").forEach((input) => {
+    input.checked = true;
+  });
+});
+printSelectedPhotosButton.addEventListener("click", printSelectedFolderPhotos);
 
 folderSide.addEventListener("click", (event) => {
   const button = event.target.closest("[data-folder]");
