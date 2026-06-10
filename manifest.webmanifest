@@ -1,7 +1,7 @@
 {
   "name": "PhotoCours",
   "short_name": "PhotoCours",
-  "description": "Prendre une photo de cours et l'envoyer directement par email.",
+  "description": "Prendre une photo de cours et l'envoyer directement au bon pseudo.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

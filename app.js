@@ -38,6 +38,7 @@ const dialogPhoto = document.querySelector("#dialogPhoto");
 const closePhotoDialogButton = document.querySelector("#closePhotoDialog");
 
 const MAX_TOTAL_BYTES = 18 * 1024 * 1024;
+const SERVER_SEND_LIMIT_BYTES = 5 * 1024 * 1024;
 const ACCOUNTS_KEY = "photocours-accounts";
 const SESSION_KEY = "photocours-session";
 const DELIVERIES_KEY = "photocours-deliveries";
@@ -47,6 +48,7 @@ let receivedPhotos = [];
 let sentPhotos = [];
 let deletedPhotos = [];
 let cameraStream = null;
+let activeFolderView = "";
 
 function setStatus(message) {
   statusMessage.textContent = message;
@@ -62,6 +64,17 @@ function getAccounts() {
 
 function saveAccounts(accounts) {
   localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+}
+
+function rememberAccount(email, pseudo, code = "") {
+  const accounts = getAccounts();
+  const current = typeof accounts[email] === "object" ? accounts[email] : {};
+  accounts[email] = {
+    ...current,
+    code: code || current.code || "",
+    pseudo
+  };
+  saveAccounts(accounts);
 }
 
 function getNameFromEmail(email) {
@@ -133,8 +146,14 @@ function setConnectedEmail(email, pseudo = "") {
   localStorage.setItem(SESSION_KEY, email);
   openLoginButton.textContent = email;
   senderInput.value = getNameFromEmail(email);
-  if (pseudo && !emailInput.value.trim()) {
-    emailInput.value = pseudo;
+}
+
+async function getApiMessage(response) {
+  try {
+    const data = await response.json();
+    return data.message || data.error || "Erreur du serveur.";
+  } catch (error) {
+    return "Erreur du serveur.";
   }
 }
 
@@ -157,7 +176,7 @@ function closeLoginView() {
   loginView.hidden = true;
 }
 
-function handleLogin(event) {
+async function handleLogin(event) {
   event.preventDefault();
 
   const pseudo = loginPseudoInput.value.trim();
@@ -169,26 +188,30 @@ function handleLogin(event) {
     return;
   }
 
-  const accounts = getAccounts();
-  const existingCode = getAccountCode(accounts[email]);
+  loginMessage.textContent = "Connexion...";
 
-  if (existingCode && existingCode !== code) {
-    loginMessage.textContent = "Cette email a deja un compte. Veuillez reessayer un nouveau code.";
-    return;
+  try {
+    const response = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pseudo, email, code })
+    });
+
+    if (!response.ok) {
+      loginMessage.textContent = await getApiMessage(response);
+      return;
+    }
+
+    const result = await response.json();
+    rememberAccount(result.email, result.pseudo, code);
+    setConnectedEmail(result.email, result.pseudo);
+    loginMessage.textContent = result.created ? "Compte cree. Vous etes connecte." : "Connexion reussie.";
+    setStatus(`Connecte avec ${result.email}.`);
+    closeLoginView();
+    await loadReceivedPhotosFromServer();
+  } catch (error) {
+    loginMessage.textContent = "Connexion impossible. Verifiez que la base D1 est bien branchee au site.";
   }
-
-  if (!existingCode) {
-    accounts[email] = { code, pseudo };
-    saveAccounts(accounts);
-    loginMessage.textContent = "Compte cree. Vous etes connecte.";
-  } else {
-    accounts[email] = { code, pseudo };
-    saveAccounts(accounts);
-    loginMessage.textContent = "Connexion reussie.";
-  }
-
-  setConnectedEmail(email, pseudo);
-  setStatus(`Connecte avec ${email}.`);
 }
 
 function stopCamera() {
@@ -330,6 +353,27 @@ function createPhotoCards(items, label) {
   `).join("");
 }
 
+async function loadReceivedPhotosFromServer() {
+  const pseudo = getCurrentPseudo();
+  if (!pseudo) {
+    receivedPhotos = [];
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/received?pseudo=${encodeURIComponent(pseudo)}`);
+    if (!response.ok) return;
+
+    const result = await response.json();
+    receivedPhotos = result.photos || [];
+    if (activeFolderView === "received") {
+      openFolderView("received");
+    }
+  } catch (error) {
+    setStatus("Impossible de charger les photos recues pour le moment.");
+  }
+}
+
 function openPhotoDialog(src) {
   dialogPhoto.src = src;
   if (photoDialog.showModal) {
@@ -407,6 +451,7 @@ function openFolderView(view) {
 function closeFolderView() {
   folderView.hidden = true;
   document.body.classList.remove("is-folder-open");
+  activeFolderView = "";
 }
 
 function getSenderName() {
@@ -415,7 +460,7 @@ function getSenderName() {
 
 function openFolderView(view) {
   const displayName = getSenderName();
-  receivedPhotos = getReceivedPhotosForCurrentUser();
+  activeFolderView = view;
 
   folderView.hidden = false;
   document.body.classList.add("is-folder-open");
@@ -555,7 +600,7 @@ async function sharePhoto() {
   const course = courseInput.value.trim();
 
   if (!navigator.share || !navigator.canShare?.({ files })) {
-    setStatus("Le partage de plusieurs photos n'est pas disponible sur ce navigateur. Telechargez les photos puis joignez-les a un email.");
+    setStatus("Le partage de plusieurs photos n'est pas disponible sur ce navigateur. Telechargez les photos puis envoyez-les avec l'application de votre choix.");
     return;
   }
 
@@ -566,7 +611,7 @@ async function sharePhoto() {
       text: `${messageInput.value.trim() || "Bonjour, voici la photo de mon cours a imprimer."}\n\n${photos.length} photo${photos.length > 1 ? "s" : ""} - ${formatBytes(getTotalBytes())}`
     });
     rememberSentPhotos("partage");
-    setStatus("Partage ouvert. Choisissez votre application mail pour envoyer les photos.");
+    setStatus("Partage ouvert. Choisissez l'application pour envoyer les photos.");
   } catch (error) {
     setStatus("Partage annule ou impossible. Vous pouvez telecharger les photos.");
   }
@@ -617,20 +662,45 @@ async function sendEmail(event) {
     return;
   }
 
-  if (!findAccountByPseudo(recipientPseudo)) {
-    setStatus("Le pseudo de reception n'est pas valide.");
-    emailInput.focus();
+  if (getTotalBytes() > SERVER_SEND_LIMIT_BYTES) {
+    setStatus(`Envoi trop lourd: ${formatBytes(getTotalBytes())} / ${formatBytes(SERVER_SEND_LIMIT_BYTES)}. Supprimez une photo ou envoyez en plusieurs fois.`);
     return;
   }
 
   const message = messageInput.value.trim();
   const course = courseInput.value.trim();
   const sender = senderInput.value.trim() || localStorage.getItem(SESSION_KEY) || "";
+  const senderEmail = localStorage.getItem(SESSION_KEY) || "";
+  const formData = new FormData();
 
-  deliverPhotosToPseudo(recipientPseudo, sender, message, course);
-  rememberSentPhotos(recipientPseudo);
-  setStatus(`Envoye sur le site a ${recipientPseudo}.`);
-  openFolderView("send");
+  formData.append("recipientPseudo", recipientPseudo);
+  formData.append("senderName", sender);
+  formData.append("senderEmail", senderEmail);
+  formData.append("course", course);
+  formData.append("message", message);
+  getPhotoFiles().forEach((file) => formData.append("photos", file));
+
+  setStatus("Envoi en cours...");
+
+  try {
+    const response = await fetch("/api/send", {
+      method: "POST",
+      body: formData
+    });
+
+    if (!response.ok) {
+      setStatus(await getApiMessage(response));
+      if (response.status === 404) emailInput.focus();
+      return;
+    }
+
+    const result = await response.json();
+    rememberSentPhotos(recipientPseudo);
+    setStatus(`${result.count} photo${result.count > 1 ? "s envoyees" : " envoyee"} sur le site a ${recipientPseudo}.`);
+    openFolderView("send");
+  } catch (error) {
+    setStatus("Envoi impossible. Verifiez que la base D1 est bien branchee au site.");
+  }
 }
 
 function handleFile(event) {
@@ -661,6 +731,7 @@ closePhotoDialogButton.addEventListener("click", closePhotoDialog);
 
 quickReceivedButton.addEventListener("click", () => {
   openFolderView("received");
+  loadReceivedPhotosFromServer();
 });
 
 quickSendButton.addEventListener("click", () => {
@@ -679,6 +750,7 @@ closeLoginButton.addEventListener("click", closeLoginView);
 loginForm.addEventListener("submit", handleLogin);
 
 loadConnectedEmail();
+loadReceivedPhotosFromServer();
 
 if (!navigator.mediaDevices?.getUserMedia) {
   startCameraButton.disabled = true;
