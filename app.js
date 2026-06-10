@@ -48,7 +48,7 @@ const siteNoticeOpenButton = document.querySelector("#siteNoticeOpen");
 const siteNoticeCloseButton = document.querySelector("#siteNoticeClose");
 const quickBadges = document.querySelectorAll("[data-badge]");
 
-const MAX_TOTAL_BYTES = 18 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 5 * 1024 * 1024;
 const SERVER_SEND_LIMIT_BYTES = 5 * 1024 * 1024;
 const ACCOUNTS_KEY = "photocours-accounts";
 const SESSION_KEY = "photocours-session";
