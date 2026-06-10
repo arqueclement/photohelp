@@ -1,4 +1,4 @@
-const CACHE_NAME = "photocours-app-v27";
+const CACHE_NAME = "photocours-app-v29";
 const APP_FILES = [
   "/",
   "/index.html",
@@ -37,5 +37,17 @@ self.addEventListener("fetch", (event) => {
         return response;
       })
       .catch(() => caches.match(event.request))
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      const client = clientList.find((item) => "focus" in item);
+      if (client) return client.focus();
+      if (clients.openWindow) return clients.openWindow("/");
+      return undefined;
+    })
   );
 });

@@ -41,12 +41,19 @@ const printPickerList = document.querySelector("#printPickerList");
 const closePrintPickerButton = document.querySelector("#closePrintPicker");
 const selectAllPrintPhotosButton = document.querySelector("#selectAllPrintPhotos");
 const printSelectedPhotosButton = document.querySelector("#printSelectedPhotos");
+const siteNotice = document.querySelector("#siteNotice");
+const siteNoticeTitle = document.querySelector("#siteNoticeTitle");
+const siteNoticeText = document.querySelector("#siteNoticeText");
+const siteNoticeOpenButton = document.querySelector("#siteNoticeOpen");
+const siteNoticeCloseButton = document.querySelector("#siteNoticeClose");
 
 const MAX_TOTAL_BYTES = 18 * 1024 * 1024;
 const SERVER_SEND_LIMIT_BYTES = 5 * 1024 * 1024;
 const ACCOUNTS_KEY = "photocours-accounts";
 const SESSION_KEY = "photocours-session";
 const DELIVERIES_KEY = "photocours-deliveries";
+const RECEIVED_COUNT_KEY = "photocours-received-count";
+const RECEIVED_POLL_MS = 30000;
 
 let photos = [];
 let receivedPhotos = [];
@@ -54,6 +61,8 @@ let sentPhotos = [];
 let deletedPhotos = [];
 let cameraStream = null;
 let activeFolderView = "";
+let receivedPollTimer = null;
+let siteNoticeFolder = "received";
 
 function setStatus(message) {
   statusMessage.textContent = message;
@@ -92,6 +101,10 @@ function getAccountCode(account) {
 
 function normalizePseudo(value) {
   return value.trim().toLowerCase();
+}
+
+function getReceivedCountKey(pseudo = getCurrentPseudo()) {
+  return `${RECEIVED_COUNT_KEY}:${normalizePseudo(pseudo || "none")}`;
 }
 
 function findAccountByPseudo(pseudo) {
@@ -151,6 +164,19 @@ function setConnectedEmail(email, pseudo = "") {
   localStorage.setItem(SESSION_KEY, email);
   openLoginButton.textContent = email;
   senderInput.value = getNameFromEmail(email);
+  requestNotificationPermission();
+  startReceivedPolling();
+}
+
+async function requestNotificationPermission() {
+  if (!("Notification" in window)) return;
+  if (Notification.permission !== "default") return;
+
+  try {
+    await Notification.requestPermission();
+  } catch (error) {
+    // Some browsers only allow this from direct user actions.
+  }
 }
 
 async function getApiMessage(response) {
@@ -359,10 +385,83 @@ function createPhotoCards(items, label) {
   `).join("");
 }
 
+function updateAppBadge(count) {
+  if (!("setAppBadge" in navigator) || !("clearAppBadge" in navigator)) return;
+
+  if (count > 0) {
+    navigator.setAppBadge(count).catch(() => {});
+  } else {
+    navigator.clearAppBadge().catch(() => {});
+  }
+}
+
+function showSiteNotice(folder, title, text) {
+  siteNoticeFolder = folder;
+  siteNoticeTitle.textContent = title;
+  siteNoticeText.textContent = text;
+  siteNotice.hidden = false;
+  window.clearTimeout(showSiteNotice.timer);
+  showSiteNotice.timer = window.setTimeout(() => {
+    siteNotice.hidden = true;
+  }, 9000);
+}
+
+async function showReceivedNotification(newCount, totalCount) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+  const title = newCount > 1 ? "Nouvelles photos reçues" : "Nouvelle photo reçue";
+  const body = newCount > 1
+    ? `${newCount} nouvelles photos sont arrivees. Total: ${totalCount}.`
+    : `1 nouvelle photo est arrivee. Total: ${totalCount}.`;
+
+  try {
+    const registration = await navigator.serviceWorker?.ready;
+    if (registration?.showNotification) {
+      await registration.showNotification(title, {
+        body,
+        badge: "icons/icon-192.svg",
+        icon: "icons/icon-192.svg",
+        tag: "photocours-received"
+      });
+      return;
+    }
+  } catch (error) {
+    // Fall back to a page notification below.
+  }
+
+  new Notification(title, {
+    body,
+    icon: "icons/icon-192.svg",
+    tag: "photocours-received"
+  });
+}
+
+function handleReceivedCount(newCount) {
+  const key = getReceivedCountKey();
+  const storedCount = localStorage.getItem(key);
+  const oldCount = storedCount === null ? newCount : Number(storedCount);
+
+  updateAppBadge(newCount);
+  localStorage.setItem(key, String(newCount));
+
+  if (storedCount !== null && newCount > oldCount) {
+    const difference = newCount - oldCount;
+    showSiteNotice(
+      "received",
+      difference > 1 ? "Nouvelles photos dans Recue" : "Nouvelle photo dans Recue",
+      difference > 1
+        ? `${difference} nouvelles photos sont arrivees dans la categorie Recue.`
+        : "1 nouvelle photo est arrivee dans la categorie Recue."
+    );
+    showReceivedNotification(newCount - oldCount, newCount);
+  }
+}
+
 async function loadReceivedPhotosFromServer() {
   const pseudo = getCurrentPseudo();
   if (!pseudo) {
     receivedPhotos = [];
+    updateAppBadge(0);
     return;
   }
 
@@ -372,12 +471,25 @@ async function loadReceivedPhotosFromServer() {
 
     const result = await response.json();
     receivedPhotos = result.photos || [];
+    handleReceivedCount(receivedPhotos.length);
     if (activeFolderView === "received") {
       openFolderView("received");
     }
   } catch (error) {
     setStatus("Impossible de charger les photos recues pour le moment.");
   }
+}
+
+function startReceivedPolling() {
+  if (receivedPollTimer) {
+    clearInterval(receivedPollTimer);
+  }
+
+  if (!getCurrentPseudo()) return;
+
+  receivedPollTimer = setInterval(() => {
+    loadReceivedPhotosFromServer();
+  }, RECEIVED_POLL_MS);
 }
 
 async function loadTrashPhotosFromServer() {
@@ -1085,6 +1197,19 @@ selectAllPrintPhotosButton.addEventListener("click", () => {
   });
 });
 printSelectedPhotosButton.addEventListener("click", printSelectedFolderPhotos);
+siteNoticeOpenButton.addEventListener("click", () => {
+  siteNotice.hidden = true;
+  openFolderView(siteNoticeFolder);
+  if (siteNoticeFolder === "received") {
+    loadReceivedPhotosFromServer();
+  }
+  if (siteNoticeFolder === "trash") {
+    loadTrashPhotosFromServer();
+  }
+});
+siteNoticeCloseButton.addEventListener("click", () => {
+  siteNotice.hidden = true;
+});
 
 folderSide.addEventListener("click", (event) => {
   const button = event.target.closest("[data-folder]");
