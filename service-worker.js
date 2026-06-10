@@ -1,4 +1,4 @@
-const CACHE_NAME = "photocours-app-v29";
+const CACHE_NAME = "photocours-app-v30";
 const APP_FILES = [
   "/",
   "/index.html",
@@ -48,6 +48,17 @@ self.addEventListener("notificationclick", (event) => {
       if (client) return client.focus();
       if (clients.openWindow) return clients.openWindow("/");
       return undefined;
+    })
+  );
+});
+
+self.addEventListener("push", (event) => {
+  event.waitUntil(
+    self.registration.showNotification("Nouvelle photo dans Recue", {
+      body: "Une nouvelle photo est arrivee dans PhotoCours.",
+      badge: "icons/icon-192.svg",
+      icon: "icons/icon-192.svg",
+      tag: "photocours-received"
     })
   );
 });

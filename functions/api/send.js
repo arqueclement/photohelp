@@ -1,4 +1,4 @@
-import { arrayBufferToBase64, initDb, json, MAX_SEND_BYTES, normalizePseudo } from "./_db.js";
+import { arrayBufferToBase64, getVapidConfig, initDb, json, MAX_SEND_BYTES, normalizePseudo, sendPushNotification } from "./_db.js";
 
 export async function onRequestPost({ request, env }) {
   if (!env.DB) {
@@ -63,6 +63,24 @@ export async function onRequestPost({ request, env }) {
       dataUrl,
       now
     ).run();
+  }
+
+  const vapidConfig = getVapidConfig(env);
+  if (vapidConfig) {
+    const subscriptions = await env.DB.prepare("SELECT endpoint, subscription_json AS subscriptionJson FROM push_subscriptions WHERE pseudo_key = ?")
+      .bind(recipientKey)
+      .all();
+
+    await Promise.all((subscriptions.results || []).map(async (row) => {
+      const subscription = JSON.parse(row.subscriptionJson);
+      const sent = await sendPushNotification(subscription, vapidConfig).catch(() => false);
+
+      if (!sent) {
+        await env.DB.prepare("DELETE FROM push_subscriptions WHERE endpoint = ?")
+          .bind(row.endpoint)
+          .run();
+      }
+    }));
   }
 
   return json({

@@ -164,7 +164,7 @@ function setConnectedEmail(email, pseudo = "") {
   localStorage.setItem(SESSION_KEY, email);
   openLoginButton.textContent = email;
   senderInput.value = getNameFromEmail(email);
-  requestNotificationPermission();
+  setupPushNotifications();
   startReceivedPolling();
 }
 
@@ -176,6 +176,48 @@ async function requestNotificationPermission() {
     await Notification.requestPermission();
   } catch (error) {
     // Some browsers only allow this from direct user actions.
+  }
+}
+
+function urlBase64ToUint8Array(value) {
+  const padding = "=".repeat((4 - value.length % 4) % 4);
+  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const output = new Uint8Array(rawData.length);
+
+  for (let index = 0; index < rawData.length; index += 1) {
+    output[index] = rawData.charCodeAt(index);
+  }
+
+  return output;
+}
+
+async function setupPushNotifications() {
+  const pseudo = getCurrentPseudo();
+  if (!pseudo || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+
+  await requestNotificationPermission();
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+  try {
+    const keyResponse = await fetch("/api/push-key");
+    if (!keyResponse.ok) return;
+
+    const { publicKey } = await keyResponse.json();
+    const registration = await navigator.serviceWorker.ready;
+    const existingSubscription = await registration.pushManager.getSubscription();
+    const subscription = existingSubscription || await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey)
+    });
+
+    await fetch("/api/push-subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pseudo, subscription })
+    });
+  } catch (error) {
+    setStatus("Notifications push indisponibles sur cet appareil pour le moment.");
   }
 }
 
