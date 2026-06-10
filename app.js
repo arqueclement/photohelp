@@ -29,6 +29,7 @@ const openLoginButton = document.querySelector("#openLogin");
 const loginView = document.querySelector("#loginView");
 const closeLoginButton = document.querySelector("#closeLogin");
 const loginForm = document.querySelector("#loginForm");
+const loginPseudoInput = document.querySelector("#loginPseudo");
 const loginEmailInput = document.querySelector("#loginEmail");
 const loginCodeInput = document.querySelector("#loginCode");
 const loginMessage = document.querySelector("#loginMessage");
@@ -59,17 +60,29 @@ function saveAccounts(accounts) {
   localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
 }
 
-function setConnectedEmail(email) {
+function getNameFromEmail(email) {
+  return email.split("@")[0].replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function getAccountCode(account) {
+  return typeof account === "string" ? account : account?.code;
+}
+
+function setConnectedEmail(email, pseudo = "") {
   localStorage.setItem(SESSION_KEY, email);
   openLoginButton.textContent = email;
-  senderInput.value = email;
+  senderInput.value = getNameFromEmail(email);
+  if (pseudo && !emailInput.value.trim()) {
+    emailInput.value = pseudo;
+  }
 }
 
 function loadConnectedEmail() {
   const email = localStorage.getItem(SESSION_KEY);
   if (email) {
-    openLoginButton.textContent = email;
-    senderInput.value = email;
+    const account = getAccounts()[email];
+    const pseudo = typeof account === "object" ? account.pseudo : "";
+    setConnectedEmail(email, pseudo);
   }
 }
 
@@ -86,30 +99,34 @@ function closeLoginView() {
 function handleLogin(event) {
   event.preventDefault();
 
+  const pseudo = loginPseudoInput.value.trim();
   const email = loginEmailInput.value.trim().toLowerCase();
   const code = loginCodeInput.value.trim();
 
-  if (!email || !code) {
-    loginMessage.textContent = "Entrez une email et un code.";
+  if (!pseudo || !email || !code) {
+    loginMessage.textContent = "Entrez un pseudo, une email et un code.";
     return;
   }
 
   const accounts = getAccounts();
+  const existingCode = getAccountCode(accounts[email]);
 
-  if (accounts[email] && accounts[email] !== code) {
+  if (existingCode && existingCode !== code) {
     loginMessage.textContent = "Cette email a deja un compte. Veuillez reessayer un nouveau code.";
     return;
   }
 
-  if (!accounts[email]) {
-    accounts[email] = code;
+  if (!existingCode) {
+    accounts[email] = { code, pseudo };
     saveAccounts(accounts);
     loginMessage.textContent = "Compte cree. Vous etes connecte.";
   } else {
+    accounts[email] = { code, pseudo };
+    saveAccounts(accounts);
     loginMessage.textContent = "Connexion reussie.";
   }
 
-  setConnectedEmail(email);
+  setConnectedEmail(email, pseudo);
   setStatus(`Connecte avec ${email}.`);
 }
 
@@ -516,9 +533,9 @@ async function sendEmail(event) {
     return;
   }
 
-  const email = emailInput.value.trim();
-  if (!emailInput.checkValidity()) {
-    setStatus("Entrez une adresse email valide.");
+  const recipientPseudo = emailInput.value.trim();
+  if (!recipientPseudo) {
+    setStatus("Entrez un pseudo de reception.");
     emailInput.focus();
     return;
   }
@@ -539,19 +556,19 @@ async function sendEmail(event) {
       await navigator.share({
         files,
         title: subject,
-        text: `${body}\n\nDestinataire: ${email}`
+        text: `${body}\n\nPseudo de reception: ${recipientPseudo}`
       });
-      rememberSentPhotos(email);
+      rememberSentPhotos(recipientPseudo);
       setStatus("Partage ouvert. Choisissez une application, verifiez le destinataire, puis envoyez.");
       return;
     }
 
     downloadPhoto();
-    const mailto = new URL(`mailto:${email}`);
+    const mailto = new URL("mailto:");
     mailto.searchParams.set("subject", subject);
-    mailto.searchParams.set("body", `${body}\n\nLes photos ont ete telechargees. Ajoutez-les en pieces jointes avant d'envoyer.`);
+    mailto.searchParams.set("body", `${body}\n\nPseudo de reception: ${recipientPseudo}\n\nLes photos ont ete telechargees. Ajoutez-les en pieces jointes avant d'envoyer.`);
     window.location.href = mailto.toString();
-    rememberSentPhotos(email);
+    rememberSentPhotos(recipientPseudo);
     setStatus("Sur ordinateur, les photos sont telechargees. Ajoutez-les en pieces jointes dans votre mail.");
   } catch (error) {
     if (error.name === "AbortError") {
