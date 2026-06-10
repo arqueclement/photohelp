@@ -71,6 +71,20 @@ function getAccountCode(account) {
   return typeof account === "string" ? account : account?.code;
 }
 
+function normalizePseudo(value) {
+  return value.trim().toLowerCase();
+}
+
+function findAccountByPseudo(pseudo) {
+  const normalizedPseudo = normalizePseudo(pseudo);
+  const accounts = getAccounts();
+
+  return Object.entries(accounts).find(([, account]) => {
+    if (typeof account === "string") return false;
+    return normalizePseudo(account.pseudo || "") === normalizedPseudo;
+  });
+}
+
 function setConnectedEmail(email, pseudo = "") {
   localStorage.setItem(SESSION_KEY, email);
   openLoginButton.textContent = email;
@@ -554,6 +568,12 @@ async function sendEmail(event) {
   const recipientPseudo = emailInput.value.trim();
   if (!recipientPseudo) {
     setStatus("Entrez un pseudo de reception.");
+    emailInput.focus();
+    return;
+  }
+
+  if (!findAccountByPseudo(recipientPseudo)) {
+    setStatus("Le pseudo de reception n'est pas valide.");
     emailInput.focus();
     return;
   }
