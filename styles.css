@@ -388,28 +388,39 @@ body.is-folder-open .login-open {
 }
 
 .mailbox-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2.5rem;
+  align-items: center;
+  min-height: 5.5rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  background: #fff;
+}
+
+.mailbox-row-open {
   display: grid;
   grid-template-columns: 4.5rem minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.85rem;
   min-height: 5.5rem;
+  width: 100%;
   border: 0;
-  border-bottom: 1px solid var(--line);
   padding: 0.75rem 1rem;
-  color: var(--ink);
-  background: #fff;
+  color: inherit;
+  background: transparent;
   cursor: pointer;
   text-align: left;
 }
 
-.mailbox-row:hover,
-.mailbox-row:focus-visible,
+.mailbox-row:hover .mailbox-row-open,
+.mailbox-row-open:focus-visible,
 .mailbox-row.is-selected {
   background: #f2f6fb;
   outline: none;
 }
 
-.mailbox-row img {
+.mailbox-row-open img {
   width: 4.5rem;
   height: 3.3rem;
   border-radius: 6px;
@@ -440,6 +451,70 @@ body.is-folder-open .login-open {
 .mailbox-row-meta {
   justify-items: end;
   color: var(--muted);
+}
+
+.mailbox-actions {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding-right: 0.5rem;
+}
+
+.mailbox-more {
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 50%;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.mailbox-more:hover,
+.mailbox-more:focus-visible,
+.mailbox-actions.is-open .mailbox-more {
+  color: var(--ink);
+  background: #e7edf5;
+  outline: none;
+}
+
+.mailbox-menu {
+  position: absolute;
+  top: 2.15rem;
+  right: 0.5rem;
+  z-index: 3;
+  display: none;
+  min-width: 8rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.3rem;
+  background: #fff;
+  box-shadow: 0 14px 30px rgba(31, 42, 68, 0.16);
+}
+
+.mailbox-actions.is-open .mailbox-menu {
+  display: block;
+}
+
+.mailbox-menu button {
+  width: 100%;
+  min-height: 2.3rem;
+  border: 0;
+  border-radius: 6px;
+  padding: 0.45rem 0.65rem;
+  color: #8d251d;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 800;
+  text-align: left;
+}
+
+.mailbox-menu button:hover,
+.mailbox-menu button:focus-visible {
+  background: #fff0ee;
+  outline: none;
 }
 
 .folder-preview {
@@ -937,7 +1012,7 @@ textarea {
     border-right: 0;
   }
 
-  .mailbox-row {
+  .mailbox-row-open {
     grid-template-columns: 3.8rem minmax(0, 1fr);
   }
 

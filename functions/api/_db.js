@@ -41,9 +41,16 @@ export async function initDb(db) {
       mime_type TEXT NOT NULL,
       size INTEGER NOT NULL,
       data_url TEXT NOT NULL,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      deleted_at TEXT
     )
   `).run();
+
+  try {
+    await db.prepare("ALTER TABLE photos ADD COLUMN deleted_at TEXT").run();
+  } catch (error) {
+    // Old databases already have this column after the first migration.
+  }
 }
 
 export function arrayBufferToBase64(buffer) {

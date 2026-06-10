@@ -374,6 +374,25 @@ async function loadReceivedPhotosFromServer() {
   }
 }
 
+async function loadTrashPhotosFromServer() {
+  const pseudo = getCurrentPseudo();
+  if (!pseudo) return;
+
+  try {
+    const response = await fetch(`/api/trash?pseudo=${encodeURIComponent(pseudo)}`);
+    if (!response.ok) return;
+
+    const result = await response.json();
+    const localPhotos = deletedPhotos.filter((photo) => !photo.id);
+    deletedPhotos = [...(result.photos || []), ...localPhotos];
+    if (activeFolderView === "trash") {
+      openFolderView("trash");
+    }
+  } catch (error) {
+    setStatus("Impossible de charger la corbeille pour le moment.");
+  }
+}
+
 function openPhotoDialog(src) {
   dialogPhoto.src = src;
   if (photoDialog.showModal) {
@@ -544,19 +563,86 @@ function createMailboxRows(items, label, view) {
     const dateLabel = date ? new Date(date).toLocaleDateString("fr-FR") : "aujourd'hui";
 
     return `
-      <button class="mailbox-row ${index === 0 ? "is-selected" : ""}" type="button" data-photo-src="${photo.dataUrl}">
-        <img src="${photo.dataUrl}" alt="${label} ${index + 1}">
-        <span class="mailbox-row-main">
-          <strong>${course}</strong>
-          <small>De : ${sender} - A : ${recipient}</small>
+      <article class="mailbox-row ${index === 0 ? "is-selected" : ""}">
+        <button class="mailbox-row-open" type="button" data-photo-src="${photo.dataUrl}">
+          <img src="${photo.dataUrl}" alt="${label} ${index + 1}">
+          <span class="mailbox-row-main">
+            <strong>${course}</strong>
+            <small>De : ${sender} - A : ${recipient}</small>
+          </span>
+          <span class="mailbox-row-meta">
+            <strong>${formatBytes(photo.size)}</strong>
+            <small>${dateLabel}</small>
+          </span>
+        </button>
+        <span class="mailbox-actions">
+          <button class="mailbox-more" type="button" data-toggle-menu aria-label="Options">...</button>
+          <span class="mailbox-menu">
+            <button type="button" data-delete-photo data-folder="${view}" data-index="${index}">
+              ${view === "trash" ? "Supprimer definitivement" : "Mettre dans la corbeille"}
+            </button>
+          </span>
         </span>
-        <span class="mailbox-row-meta">
-          <strong>${formatBytes(photo.size)}</strong>
-          <small>${dateLabel}</small>
-        </span>
-      </button>
+      </article>
     `;
   }).join("");
+}
+
+async function deletePhotoFromServer(photo, permanent = false) {
+  const pseudo = getCurrentPseudo();
+  if (!photo.id || !pseudo) return true;
+
+  const response = await fetch(`/api/photo?id=${encodeURIComponent(photo.id)}&pseudo=${encodeURIComponent(pseudo)}&permanent=${permanent ? "1" : "0"}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    setStatus(await getApiMessage(response));
+    return false;
+  }
+
+  return true;
+}
+
+async function deletePhotoAt(view, index) {
+  const folders = {
+    received: receivedPhotos,
+    send: sentPhotos,
+    trash: deletedPhotos,
+    photo: photos
+  };
+  const list = folders[view];
+  const photo = list?.[index];
+  if (!photo) return;
+
+  if (view === "received") {
+    const deleted = await deletePhotoFromServer(photo, false);
+    if (!deleted) return;
+    receivedPhotos.splice(index, 1);
+    deletedPhotos = [{ ...photo, deletedAt: new Date().toISOString() }, ...deletedPhotos];
+  }
+
+  if (view === "send") {
+    sentPhotos.splice(index, 1);
+    deletedPhotos = [{ ...photo, deletedAt: new Date().toISOString() }, ...deletedPhotos];
+  }
+
+  if (view === "trash") {
+    if (photo.id) {
+      const deleted = await deletePhotoFromServer(photo, true);
+      if (!deleted) return;
+    }
+    deletedPhotos.splice(index, 1);
+  }
+
+  if (view === "photo") {
+    deletedPhotos = [{ ...photo, deletedAt: new Date().toISOString() }, ...deletedPhotos];
+    photos.splice(index, 1);
+    renderPhotos();
+  }
+
+  setStatus(view === "trash" ? "Photo supprimee definitivement." : "Photo mise dans la corbeille.");
+  openFolderView(view);
 }
 
 function createFolderPreview(info, view) {
@@ -565,7 +651,7 @@ function createFolderPreview(info, view) {
   if (!firstPhoto) {
     return `
       <aside class="folder-preview">
-        <h3>Aperçu</h3>
+        <h3>Apercu</h3>
         <p>Selectionnez une photo pour la voir ici.</p>
       </aside>
     `;
@@ -824,7 +910,22 @@ printPhotoButton.addEventListener("click", printPhoto);
 sendForm.addEventListener("submit", sendEmail);
 fileInput.addEventListener("change", handleFile);
 folderContent.addEventListener("click", (event) => {
-  const card = event.target.closest(".folder-photo-card, .mailbox-row, .folder-preview-photo");
+  const deleteButton = event.target.closest("[data-delete-photo]");
+  if (deleteButton) {
+    deletePhotoAt(deleteButton.dataset.folder, Number(deleteButton.dataset.index));
+    return;
+  }
+
+  const menuButton = event.target.closest("[data-toggle-menu]");
+  if (menuButton) {
+    const actions = menuButton.closest(".mailbox-actions");
+    const wasOpen = actions.classList.contains("is-open");
+    document.querySelectorAll(".mailbox-actions.is-open").forEach((item) => item.classList.remove("is-open"));
+    actions.classList.toggle("is-open", !wasOpen);
+    return;
+  }
+
+  const card = event.target.closest(".folder-photo-card, .mailbox-row-open, .folder-preview-photo");
   if (!card) return;
   openPhotoDialog(card.dataset.photoSrc);
 });
@@ -838,6 +939,9 @@ folderSide.addEventListener("click", (event) => {
   if (button.dataset.folder === "received") {
     loadReceivedPhotosFromServer();
   }
+  if (button.dataset.folder === "trash") {
+    loadTrashPhotosFromServer();
+  }
 });
 
 quickReceivedButton.addEventListener("click", () => {
@@ -849,7 +953,10 @@ quickSendButton.addEventListener("click", () => {
   openFolderView("send");
 });
 
-quickTrashButton.addEventListener("click", clearPhotos);
+quickTrashButton.addEventListener("click", () => {
+  openFolderView("trash");
+  loadTrashPhotosFromServer();
+});
 
 quickPhotoButton.addEventListener("click", () => {
   openFolderView("photo");
@@ -862,6 +969,7 @@ loginForm.addEventListener("submit", handleLogin);
 
 loadConnectedEmail();
 loadReceivedPhotosFromServer();
+loadTrashPhotosFromServer();
 
 if (!navigator.mediaDevices?.getUserMedia) {
   startCameraButton.disabled = true;

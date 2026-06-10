@@ -8,8 +8,7 @@ export async function onRequestGet({ request, env }) {
   await initDb(env.DB);
 
   const url = new URL(request.url);
-  const pseudo = url.searchParams.get("pseudo") || "";
-  const pseudoKey = normalizePseudo(pseudo);
+  const pseudoKey = normalizePseudo(url.searchParams.get("pseudo") || "");
 
   if (!pseudoKey) {
     return json({ photos: [] });
@@ -18,10 +17,10 @@ export async function onRequestGet({ request, env }) {
   const result = await env.DB.prepare(`
     SELECT id, recipient_pseudo AS recipient, sender_name AS sender, sender_email AS senderEmail, course, message,
            file_name AS fileName, mime_type AS mimeType, size, data_url AS dataUrl,
-           created_at AS deliveredAt
+           created_at AS deliveredAt, deleted_at AS deletedAt
     FROM photos
-    WHERE recipient_key = ? AND deleted_at IS NULL
-    ORDER BY created_at DESC
+    WHERE recipient_key = ? AND deleted_at IS NOT NULL
+    ORDER BY deleted_at DESC
     LIMIT 100
   `).bind(pseudoKey).all();
 
