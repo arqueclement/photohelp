@@ -1,4 +1,4 @@
-const CACHE_NAME = "photocours-app-v32";
+const CACHE_NAME = "photocours-app-v33";
 const APP_FILES = [
   "/",
   "/index.html",
@@ -9,6 +9,59 @@ const APP_FILES = [
   "/icons/icon-192.svg",
   "/icons/icon-512.svg"
 ];
+const BADGE_DB = "photocours-badge";
+const BADGE_STORE = "badge";
+const BADGE_KEY = "received";
+
+function openBadgeDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(BADGE_DB, 1);
+
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(BADGE_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getStoredBadgeCount() {
+  const db = await openBadgeDb();
+
+  return new Promise((resolve) => {
+    const request = db.transaction(BADGE_STORE, "readonly").objectStore(BADGE_STORE).get(BADGE_KEY);
+    request.onsuccess = () => resolve(Number(request.result) || 0);
+    request.onerror = () => resolve(0);
+  });
+}
+
+async function storeBadgeCount(count) {
+  const db = await openBadgeDb();
+
+  return new Promise((resolve) => {
+    const request = db.transaction(BADGE_STORE, "readwrite").objectStore(BADGE_STORE).put(count, BADGE_KEY);
+    request.onsuccess = () => resolve();
+    request.onerror = () => resolve();
+  });
+}
+
+async function setIconBadge(count) {
+  await storeBadgeCount(count);
+
+  if ("setAppBadge" in self.registration && count > 0) {
+    await self.registration.setAppBadge(count).catch(() => {});
+  }
+
+  if ("clearAppBadge" in self.registration && count <= 0) {
+    await self.registration.clearAppBadge().catch(() => {});
+  }
+}
+
+async function incrementIconBadge() {
+  const nextCount = await getStoredBadgeCount() + 1;
+  await setIconBadge(nextCount);
+  return nextCount;
+}
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -54,11 +107,20 @@ self.addEventListener("notificationclick", (event) => {
 
 self.addEventListener("push", (event) => {
   event.waitUntil(
-    self.registration.showNotification("Nouvelle photo dans Recue", {
-      body: "Une nouvelle photo est arrivee dans PhotoCours.",
-      badge: "icons/icon-192.svg",
-      icon: "icons/icon-192.svg",
-      tag: "photocours-received"
-    })
+    incrementIconBadge().then((count) =>
+      self.registration.showNotification("Nouvelle photo dans Recue", {
+        body: count > 1
+          ? `${count} nouvelles photos attendent dans PhotoCours.`
+          : "Une nouvelle photo est arrivee dans PhotoCours.",
+        badge: "icons/icon-192.svg",
+        icon: "icons/icon-192.svg",
+        tag: "photocours-received"
+      })
+    )
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "SET_BADGE") return;
+  event.waitUntil(setIconBadge(Number(event.data.count) || 0));
 });

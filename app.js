@@ -447,6 +447,7 @@ function createPhotoCards(items, label) {
 }
 
 function updateAppBadge(count) {
+  syncServiceWorkerBadge(count);
   if (!("setAppBadge" in navigator) || !("clearAppBadge" in navigator)) return;
 
   if (count > 0) {
@@ -454,6 +455,16 @@ function updateAppBadge(count) {
   } else {
     navigator.clearAppBadge().catch(() => {});
   }
+}
+
+function syncServiceWorkerBadge(count) {
+  if (!("serviceWorker" in navigator)) return;
+
+  const message = { type: "SET_BADGE", count };
+  navigator.serviceWorker.controller?.postMessage(message);
+  navigator.serviceWorker.ready
+    .then((registration) => registration.active?.postMessage(message))
+    .catch(() => {});
 }
 
 function showSiteNotice(folder, title, text) {
