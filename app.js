@@ -512,7 +512,7 @@ async function sendEmail(event) {
   event.preventDefault();
 
   if (!photos.length) {
-    setStatus("Ajoutez une photo avant d'envoyer le mail.");
+    setStatus("Ajoutez une photo avant d'envoyer.");
     return;
   }
 
@@ -531,7 +531,7 @@ async function sendEmail(event) {
   const body = `${message || "Bonjour, voici la photo de mon cours a imprimer."}${senderLine}\n\n${photos.length} photo${photos.length > 1 ? "s" : ""} - ${formatBytes(getTotalBytes())}`;
   const files = getPhotoFiles();
 
-  setStatus("Ouverture de l'application mail...");
+  setStatus("Ouverture du partage...");
   emailPhotoButton.disabled = true;
 
   try {
@@ -542,7 +542,7 @@ async function sendEmail(event) {
         text: `${body}\n\nDestinataire: ${email}`
       });
       rememberSentPhotos(email);
-      setStatus("Partage ouvert. Choisissez Gmail ou Mail, verifiez le destinataire, puis envoyez.");
+      setStatus("Partage ouvert. Choisissez une application, verifiez le destinataire, puis envoyez.");
       return;
     }
 
