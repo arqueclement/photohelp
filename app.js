@@ -40,6 +40,7 @@ const closePhotoDialogButton = document.querySelector("#closePhotoDialog");
 const MAX_TOTAL_BYTES = 18 * 1024 * 1024;
 const ACCOUNTS_KEY = "photocours-accounts";
 const SESSION_KEY = "photocours-session";
+const DELIVERIES_KEY = "photocours-deliveries";
 
 let photos = [];
 let receivedPhotos = [];
@@ -83,6 +84,49 @@ function findAccountByPseudo(pseudo) {
     if (typeof account === "string") return false;
     return normalizePseudo(account.pseudo || "") === normalizedPseudo;
   });
+}
+
+function getCurrentPseudo() {
+  const email = localStorage.getItem(SESSION_KEY);
+  const account = email ? getAccounts()[email] : null;
+  return typeof account === "object" ? account.pseudo || "" : "";
+}
+
+function getDeliveries() {
+  try {
+    return JSON.parse(localStorage.getItem(DELIVERIES_KEY)) || {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function saveDeliveries(deliveries) {
+  localStorage.setItem(DELIVERIES_KEY, JSON.stringify(deliveries));
+}
+
+function getReceivedPhotosForCurrentUser() {
+  const pseudo = getCurrentPseudo();
+  if (!pseudo) return [];
+
+  return getDeliveries()[normalizePseudo(pseudo)] || [];
+}
+
+function deliverPhotosToPseudo(recipientPseudo, sender, message, course) {
+  const key = normalizePseudo(recipientPseudo);
+  const deliveredAt = new Date().toISOString();
+  const deliveries = getDeliveries();
+  const deliveredPhotos = photos.map((photo) => ({
+    ...photo,
+    recipient: recipientPseudo,
+    sender,
+    message,
+    course,
+    deliveredAt
+  }));
+
+  deliveries[key] = [...deliveredPhotos, ...(deliveries[key] || [])];
+  saveDeliveries(deliveries);
+  receivedPhotos = getReceivedPhotosForCurrentUser();
 }
 
 function setConnectedEmail(email, pseudo = "") {
@@ -371,6 +415,7 @@ function getSenderName() {
 
 function openFolderView(view) {
   const displayName = getSenderName();
+  receivedPhotos = getReceivedPhotosForCurrentUser();
 
   folderView.hidden = false;
   document.body.classList.add("is-folder-open");
@@ -581,43 +626,11 @@ async function sendEmail(event) {
   const message = messageInput.value.trim();
   const course = courseInput.value.trim();
   const sender = senderInput.value.trim() || localStorage.getItem(SESSION_KEY) || "";
-  const subject = course ? `Photo de cours - ${course}` : "Photo de cours";
-  const senderLine = sender ? `\n\nDe la part de: ${sender}` : "";
-  const body = `${message || "Bonjour, voici la photo de mon cours a imprimer."}${senderLine}\n\n${photos.length} photo${photos.length > 1 ? "s" : ""} - ${formatBytes(getTotalBytes())}`;
-  const files = getPhotoFiles();
 
-  setStatus("Ouverture du partage...");
-  emailPhotoButton.disabled = true;
-
-  try {
-    if (navigator.share && navigator.canShare?.({ files })) {
-      await navigator.share({
-        files,
-        title: subject,
-        text: `${body}\n\nPseudo de reception: ${recipientPseudo}`
-      });
-      rememberSentPhotos(recipientPseudo);
-      setStatus("Partage ouvert. Choisissez une application, verifiez le destinataire, puis envoyez.");
-      return;
-    }
-
-    downloadPhoto();
-    const mailto = new URL("mailto:");
-    mailto.searchParams.set("subject", subject);
-    mailto.searchParams.set("body", `${body}\n\nPseudo de reception: ${recipientPseudo}\n\nLes photos ont ete telechargees. Ajoutez-les en pieces jointes avant d'envoyer.`);
-    window.location.href = mailto.toString();
-    rememberSentPhotos(recipientPseudo);
-    setStatus("Sur ordinateur, les photos sont telechargees. Ajoutez-les en pieces jointes dans votre mail.");
-  } catch (error) {
-    if (error.name === "AbortError") {
-      setStatus("Partage ferme sans envoi. Sur telephone, choisissez Gmail ou Mail. Sur ordinateur, utilisez Telecharger.");
-      return;
-    }
-
-    setStatus("Partage impossible ici. Sur ordinateur, utilisez Telecharger puis ajoutez les photos au mail.");
-  } finally {
-    emailPhotoButton.disabled = false;
-  }
+  deliverPhotosToPseudo(recipientPseudo, sender, message, course);
+  rememberSentPhotos(recipientPseudo);
+  setStatus(`Envoye sur le site a ${recipientPseudo}.`);
+  openFolderView("send");
 }
 
 function handleFile(event) {
