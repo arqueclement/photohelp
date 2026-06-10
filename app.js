@@ -79,9 +79,6 @@ function setQuickBadge(name, count) {
 
 function updateQuickBadges() {
   setQuickBadge("received", receivedPhotos.length);
-  setQuickBadge("send", getVisibleSentPhotos().length);
-  setQuickBadge("trash", deletedPhotos.length);
-  setQuickBadge("photo", photos.length);
 }
 
 function getAccounts() {
@@ -374,11 +371,23 @@ function renderPhotos() {
   photoState.textContent = `${photos.length} photo${photos.length > 1 ? "s" : ""} - ${formatBytes(getTotalBytes())} / ${formatBytes(MAX_TOTAL_BYTES)}`;
   photoList.innerHTML = photos.map((photo, index) => `
     <div class="photo-item">
-      <span>Photo ${index + 1}</span>
+      <span class="photo-item-name">Photo ${index + 1}</span>
       <strong>${formatBytes(photo.size)}</strong>
+      <button class="photo-delete-button" type="button" data-remove-photo="${index}" aria-label="Supprimer la photo ${index + 1}">Supprimer</button>
     </div>
   `).join("");
   updatePhotoButtons();
+}
+
+function removePhoto(index) {
+  const photo = photos[index];
+  if (!photo) return;
+
+  deletedPhotos = [{ ...photo, deletedAt: new Date().toISOString() }, ...deletedPhotos];
+  photos.splice(index, 1);
+  renderPhotos();
+  updateQuickBadges();
+  setStatus("Photo mise dans la corbeille.");
 }
 
 function addPhoto(dataUrl, fileName = "") {
@@ -1255,6 +1264,12 @@ downloadPhotoButton.addEventListener("click", downloadPhoto);
 printPhotoButton.addEventListener("click", printPhoto);
 sendForm.addEventListener("submit", sendEmail);
 fileInput.addEventListener("change", handleFile);
+photoList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-remove-photo]");
+  if (!button) return;
+
+  removePhoto(Number(button.dataset.removePhoto));
+});
 folderContent.addEventListener("click", (event) => {
   const printButton = event.target.closest("[data-print-folder]");
   if (printButton) {

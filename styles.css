@@ -1026,9 +1026,9 @@ h1 {
 }
 
 .photo-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  justify-content: space-between;
   gap: 0.75rem;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1038,8 +1038,32 @@ h1 {
   font-size: 0.9rem;
 }
 
+.photo-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .photo-item strong {
   color: var(--ink);
+}
+
+.photo-delete-button {
+  min-height: 2rem;
+  border: 0;
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+  color: #fff;
+  background: #c9342b;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.photo-delete-button:hover,
+.photo-delete-button:focus-visible {
+  background: #9f241d;
+  outline: none;
 }
 
 .empty-state {
