@@ -11,6 +11,21 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
+    <nav class="quick-actions" aria-label="Raccourcis">
+      <button id="quickReceived" class="quick-action" type="button">reçue</button>
+      <button id="quickSend" class="quick-action" type="button">envoyer</button>
+      <button id="quickTrash" class="quick-action" type="button">corbeille</button>
+      <button id="quickPhoto" class="quick-action" type="button">photo</button>
+    </nav>
+
+    <section id="folderView" class="folder-view" hidden>
+      <button id="backToMain" class="folder-back" type="button">retour</button>
+      <div class="folder-shell">
+        <aside id="folderSide" class="folder-side"></aside>
+        <div id="folderContent" class="folder-content"></div>
+      </div>
+    </section>
+
     <main class="app">
       <section class="hero">
         <div class="hero__copy">

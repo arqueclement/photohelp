@@ -16,10 +16,19 @@ const courseInput = document.querySelector("#courseInput");
 const messageInput = document.querySelector("#messageInput");
 const statusMessage = document.querySelector("#statusMessage");
 const photoState = document.querySelector("#photoState");
+const quickReceivedButton = document.querySelector("#quickReceived");
+const quickSendButton = document.querySelector("#quickSend");
+const quickTrashButton = document.querySelector("#quickTrash");
+const quickPhotoButton = document.querySelector("#quickPhoto");
+const folderView = document.querySelector("#folderView");
+const folderSide = document.querySelector("#folderSide");
+const folderContent = document.querySelector("#folderContent");
+const backToMainButton = document.querySelector("#backToMain");
 
 const MAX_TOTAL_BYTES = 18 * 1024 * 1024;
 
 let photos = [];
+let deletedPhotos = [];
 let cameraStream = null;
 
 function setStatus(message) {
@@ -122,6 +131,105 @@ function addPhoto(dataUrl, fileName = "") {
   setStatus(`${photos.length} photo${photos.length > 1 ? "s" : ""} ajoutee${photos.length > 1 ? "s" : ""}. Total: ${formatBytes(getTotalBytes())}. Reste: ${formatBytes(getRemainingBytes())}.`);
   stopCamera();
   return true;
+}
+
+function clearPhotos() {
+  deletedPhotos = [
+    ...photos.map((photo) => ({ ...photo, deletedAt: new Date().toISOString() })),
+    ...deletedPhotos
+  ];
+  photos = [];
+  stopCamera();
+  renderPhotos();
+  setStatus("Photos envoyees dans la corbeille.");
+  openFolderView("trash");
+}
+
+function scrollToPanel(element) {
+  element.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function getDisplayName() {
+  const course = courseInput.value.trim();
+  return course || "clément";
+}
+
+function createPhotoCards(items, label) {
+  if (!items.length) {
+    return `<p class="folder-empty">Aucune photo.</p>`;
+  }
+
+  return items.map((photo, index) => `
+    <article class="folder-photo-card">
+      <img src="${photo.dataUrl}" alt="${label} ${index + 1}">
+      <strong>${label}</strong>
+      <span>${formatBytes(photo.size)}</span>
+    </article>
+  `).join("");
+}
+
+function openFolderView(view) {
+  const email = emailInput.value.trim() || "sophie";
+  const displayName = getDisplayName();
+
+  folderView.hidden = false;
+  document.body.classList.add("is-folder-open");
+
+  if (view === "received") {
+    folderSide.innerHTML = `
+      <button class="folder-tab is-active" type="button">recue</button>
+      <div class="folder-person">
+        <span class="folder-avatar" aria-hidden="true"></span>
+        <strong>clément</strong>
+      </div>
+    `;
+    folderContent.innerHTML = `
+      <button class="folder-tab" type="button">clement</button>
+      <div class="folder-card-row">
+        ${createPhotoCards(photos.slice(0, 4), "photo reçue")}
+      </div>
+    `;
+    return;
+  }
+
+  if (view === "send") {
+    folderSide.innerHTML = `
+      <button class="folder-tab is-active" type="button">envoyer</button>
+      <p class="folder-recipient">à : ${email}</p>
+    `;
+    folderContent.innerHTML = `
+      <div class="folder-card-row">
+        ${createPhotoCards(photos, `photo de ${displayName}`)}
+      </div>
+    `;
+    return;
+  }
+
+  if (view === "trash") {
+    folderSide.innerHTML = `
+      <button class="folder-tab is-active" type="button">photo supprimer</button>
+    `;
+    folderContent.innerHTML = `
+      <div class="folder-card-row">
+        ${createPhotoCards(deletedPhotos, "photo supprimer")}
+      </div>
+    `;
+    return;
+  }
+
+  folderSide.innerHTML = `
+    <button class="folder-tab is-active" type="button">photo</button>
+  `;
+  folderContent.innerHTML = `
+    <div class="folder-card-row folder-card-grid">
+      ${createPhotoCards(photos, "photo non supprimer")}
+    </div>
+  `;
+}
+
+function closeFolderView() {
+  folderView.hidden = true;
+  document.body.classList.remove("is-folder-open");
 }
 
 function getFileName() {
@@ -329,6 +437,22 @@ downloadPhotoButton.addEventListener("click", downloadPhoto);
 printPhotoButton.addEventListener("click", printPhoto);
 sendForm.addEventListener("submit", sendEmail);
 fileInput.addEventListener("change", handleFile);
+
+quickReceivedButton.addEventListener("click", () => {
+  openFolderView("received");
+});
+
+quickSendButton.addEventListener("click", () => {
+  openFolderView("send");
+});
+
+quickTrashButton.addEventListener("click", clearPhotos);
+
+quickPhotoButton.addEventListener("click", () => {
+  openFolderView("photo");
+});
+
+backToMainButton.addEventListener("click", closeFolderView);
 
 if (!navigator.mediaDevices?.getUserMedia) {
   startCameraButton.disabled = true;
