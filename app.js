@@ -13,6 +13,7 @@ const emptyState = document.querySelector("#emptyState");
 const sendForm = document.querySelector("#sendForm");
 const emailInput = document.querySelector("#emailInput");
 const courseInput = document.querySelector("#courseInput");
+const senderInput = document.querySelector("#senderInput");
 const messageInput = document.querySelector("#messageInput");
 const statusMessage = document.querySelector("#statusMessage");
 const photoState = document.querySelector("#photoState");
@@ -61,12 +62,14 @@ function saveAccounts(accounts) {
 function setConnectedEmail(email) {
   localStorage.setItem(SESSION_KEY, email);
   openLoginButton.textContent = email;
+  senderInput.value = email;
 }
 
 function loadConnectedEmail() {
   const email = localStorage.getItem(SESSION_KEY);
   if (email) {
     openLoginButton.textContent = email;
+    senderInput.value = email;
   }
 }
 
@@ -313,6 +316,64 @@ function closeFolderView() {
   document.body.classList.remove("is-folder-open");
 }
 
+function getSenderName() {
+  return senderInput.value.trim() || localStorage.getItem(SESSION_KEY) || "la personne connectee";
+}
+
+function openFolderView(view) {
+  const displayName = getSenderName();
+
+  folderView.hidden = false;
+  document.body.classList.add("is-folder-open");
+
+  if (view === "received") {
+    folderSide.innerHTML = `
+      <button class="folder-tab is-active" type="button">recue</button>
+    `;
+    folderContent.innerHTML = `
+      <button class="folder-tab" type="button">photos recues</button>
+      <div class="folder-card-row">
+        ${createPhotoCards(receivedPhotos, "photo recue")}
+      </div>
+    `;
+    return;
+  }
+
+  if (view === "send") {
+    folderSide.innerHTML = `
+      <button class="folder-tab is-active" type="button">envoyer</button>
+      <p class="folder-recipient">photos envoyees</p>
+    `;
+    folderContent.innerHTML = `
+      <div class="folder-card-row">
+        ${createPhotoCards(sentPhotos, `photo de ${displayName}`)}
+      </div>
+    `;
+    return;
+  }
+
+  if (view === "trash") {
+    folderSide.innerHTML = `
+      <button class="folder-tab is-active" type="button">photo supprimer</button>
+    `;
+    folderContent.innerHTML = `
+      <div class="folder-card-row">
+        ${createPhotoCards(deletedPhotos, "photo supprimer")}
+      </div>
+    `;
+    return;
+  }
+
+  folderSide.innerHTML = `
+    <button class="folder-tab is-active" type="button">photo</button>
+  `;
+  folderContent.innerHTML = `
+    <div class="folder-card-row folder-card-grid">
+      ${createPhotoCards(photos, "photo non supprimer")}
+    </div>
+  `;
+}
+
 function getFileName() {
   const course = courseInput.value.trim().replace(/[^a-z0-9-]+/gi, "-") || "cours";
   return `${course}-photo.png`;
@@ -464,8 +525,10 @@ async function sendEmail(event) {
 
   const message = messageInput.value.trim();
   const course = courseInput.value.trim();
+  const sender = senderInput.value.trim() || localStorage.getItem(SESSION_KEY) || "";
   const subject = course ? `Photo de cours - ${course}` : "Photo de cours";
-  const body = `${message || "Bonjour, voici la photo de mon cours a imprimer."}\n\n${photos.length} photo${photos.length > 1 ? "s" : ""} - ${formatBytes(getTotalBytes())}`;
+  const senderLine = sender ? `\n\nDe la part de: ${sender}` : "";
+  const body = `${message || "Bonjour, voici la photo de mon cours a imprimer."}${senderLine}\n\n${photos.length} photo${photos.length > 1 ? "s" : ""} - ${formatBytes(getTotalBytes())}`;
   const files = getPhotoFiles();
 
   setStatus("Ouverture de l'application mail...");
