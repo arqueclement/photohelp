@@ -24,15 +24,90 @@ const folderView = document.querySelector("#folderView");
 const folderSide = document.querySelector("#folderSide");
 const folderContent = document.querySelector("#folderContent");
 const backToMainButton = document.querySelector("#backToMain");
+const openLoginButton = document.querySelector("#openLogin");
+const loginView = document.querySelector("#loginView");
+const closeLoginButton = document.querySelector("#closeLogin");
+const loginForm = document.querySelector("#loginForm");
+const loginEmailInput = document.querySelector("#loginEmail");
+const loginCodeInput = document.querySelector("#loginCode");
+const loginMessage = document.querySelector("#loginMessage");
 
 const MAX_TOTAL_BYTES = 18 * 1024 * 1024;
+const ACCOUNTS_KEY = "photocours-accounts";
+const SESSION_KEY = "photocours-session";
 
 let photos = [];
+let receivedPhotos = [];
+let sentPhotos = [];
 let deletedPhotos = [];
 let cameraStream = null;
 
 function setStatus(message) {
   statusMessage.textContent = message;
+}
+
+function getAccounts() {
+  try {
+    return JSON.parse(localStorage.getItem(ACCOUNTS_KEY)) || {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function saveAccounts(accounts) {
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+}
+
+function setConnectedEmail(email) {
+  localStorage.setItem(SESSION_KEY, email);
+  openLoginButton.textContent = email;
+}
+
+function loadConnectedEmail() {
+  const email = localStorage.getItem(SESSION_KEY);
+  if (email) {
+    openLoginButton.textContent = email;
+  }
+}
+
+function openLoginView() {
+  loginView.hidden = false;
+  loginMessage.textContent = "";
+  loginEmailInput.focus();
+}
+
+function closeLoginView() {
+  loginView.hidden = true;
+}
+
+function handleLogin(event) {
+  event.preventDefault();
+
+  const email = loginEmailInput.value.trim().toLowerCase();
+  const code = loginCodeInput.value.trim();
+
+  if (!email || !code) {
+    loginMessage.textContent = "Entrez une email et un code.";
+    return;
+  }
+
+  const accounts = getAccounts();
+
+  if (accounts[email] && accounts[email] !== code) {
+    loginMessage.textContent = "Cette email a deja un compte. Veuillez reessayer un nouveau code.";
+    return;
+  }
+
+  if (!accounts[email]) {
+    accounts[email] = code;
+    saveAccounts(accounts);
+    loginMessage.textContent = "Compte cree. Vous etes connecte.";
+  } else {
+    loginMessage.textContent = "Connexion reussie.";
+  }
+
+  setConnectedEmail(email);
+  setStatus(`Connecte avec ${email}.`);
 }
 
 function stopCamera() {
@@ -145,8 +220,14 @@ function clearPhotos() {
   openFolderView("trash");
 }
 
-function scrollToPanel(element) {
-  element.scrollIntoView({ behavior: "smooth", block: "start" });
+function rememberSentPhotos(recipient) {
+  if (!photos.length) return;
+
+  const sentAt = new Date().toISOString();
+  sentPhotos = [
+    ...photos.map((photo) => ({ ...photo, recipient, sentAt })),
+    ...sentPhotos
+  ];
 }
 
 function getDisplayName() {
@@ -184,9 +265,9 @@ function openFolderView(view) {
       </div>
     `;
     folderContent.innerHTML = `
-      <button class="folder-tab" type="button">clement</button>
+      <button class="folder-tab" type="button">photos reçues</button>
       <div class="folder-card-row">
-        ${createPhotoCards(photos.slice(0, 4), "photo reçue")}
+        ${createPhotoCards(receivedPhotos, "photo reçue")}
       </div>
     `;
     return;
@@ -195,11 +276,11 @@ function openFolderView(view) {
   if (view === "send") {
     folderSide.innerHTML = `
       <button class="folder-tab is-active" type="button">envoyer</button>
-      <p class="folder-recipient">à : ${email}</p>
+      <p class="folder-recipient">photos envoyées</p>
     `;
     folderContent.innerHTML = `
       <div class="folder-card-row">
-        ${createPhotoCards(photos, `photo de ${displayName}`)}
+        ${createPhotoCards(sentPhotos, `photo de ${displayName}`)}
       </div>
     `;
     return;
@@ -329,6 +410,7 @@ async function sharePhoto() {
       title: course ? `Photo de cours - ${course}` : "Photo de cours",
       text: `${messageInput.value.trim() || "Bonjour, voici la photo de mon cours a imprimer."}\n\n${photos.length} photo${photos.length > 1 ? "s" : ""} - ${formatBytes(getTotalBytes())}`
     });
+    rememberSentPhotos("partage");
     setStatus("Partage ouvert. Choisissez votre application mail pour envoyer les photos.");
   } catch (error) {
     setStatus("Partage annule ou impossible. Vous pouvez telecharger les photos.");
@@ -396,6 +478,7 @@ async function sendEmail(event) {
         title: subject,
         text: `${body}\n\nDestinataire: ${email}`
       });
+      rememberSentPhotos(email);
       setStatus("Partage ouvert. Choisissez Gmail ou Mail, verifiez le destinataire, puis envoyez.");
       return;
     }
@@ -405,6 +488,7 @@ async function sendEmail(event) {
     mailto.searchParams.set("subject", subject);
     mailto.searchParams.set("body", `${body}\n\nLes photos ont ete telechargees. Ajoutez-les en pieces jointes avant d'envoyer.`);
     window.location.href = mailto.toString();
+    rememberSentPhotos(email);
     setStatus("Sur ordinateur, les photos sont telechargees. Ajoutez-les en pieces jointes dans votre mail.");
   } catch (error) {
     if (error.name === "AbortError") {
@@ -453,6 +537,11 @@ quickPhotoButton.addEventListener("click", () => {
 });
 
 backToMainButton.addEventListener("click", closeFolderView);
+openLoginButton.addEventListener("click", openLoginView);
+closeLoginButton.addEventListener("click", closeLoginView);
+loginForm.addEventListener("submit", handleLogin);
+
+loadConnectedEmail();
 
 if (!navigator.mediaDevices?.getUserMedia) {
   startCameraButton.disabled = true;

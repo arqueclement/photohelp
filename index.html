@@ -18,6 +18,25 @@
       <button id="quickPhoto" class="quick-action" type="button">photo</button>
     </nav>
 
+    <button id="openLogin" class="login-open" type="button">se connecter</button>
+
+    <section id="loginView" class="login-view" hidden>
+      <button id="closeLogin" class="folder-back" type="button">retour</button>
+      <form id="loginForm" class="login-panel">
+        <h2>se connecter</h2>
+        <label>
+          email :
+          <input id="loginEmail" type="email" autocomplete="email" required>
+        </label>
+        <label>
+          code :
+          <input id="loginCode" type="password" autocomplete="current-password" required>
+        </label>
+        <button class="login-submit" type="submit">se connecter</button>
+        <p id="loginMessage" class="login-message" role="status"></p>
+      </form>
+    </section>
+
     <section id="folderView" class="folder-view" hidden>
       <button id="backToMain" class="folder-back" type="button">retour</button>
       <div class="folder-shell">
