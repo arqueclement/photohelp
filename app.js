@@ -329,7 +329,7 @@ function rememberSentPhotos(recipient) {
 
   const sentAt = new Date().toISOString();
   sentPhotos = [
-    ...photos.map((photo) => ({ ...photo, recipient, sentAt })),
+    ...photos.map((photo) => ({ ...photo, sender: getSenderName(), recipient, sentAt })),
     ...sentPhotos
   ];
 }
@@ -458,58 +458,159 @@ function getSenderName() {
   return senderInput.value.trim() || localStorage.getItem(SESSION_KEY) || "la personne connectee";
 }
 
-function openFolderView(view) {
+function getFolderInfo(view) {
   const displayName = getSenderName();
+  const folders = {
+    received: {
+      title: "Recue",
+      subtitle: "Photos que les autres vous ont envoyees",
+      label: "photo recue",
+      items: receivedPhotos
+    },
+    send: {
+      title: "Envoyer",
+      subtitle: "Photos que vous avez envoyees",
+      label: `photo de ${displayName}`,
+      items: sentPhotos
+    },
+    trash: {
+      title: "Corbeille",
+      subtitle: "Photos supprimees",
+      label: "photo supprimer",
+      items: deletedPhotos
+    },
+    photo: {
+      title: "Photo",
+      subtitle: "Photos prises sur cet appareil",
+      label: "photo non supprimer",
+      items: photos
+    }
+  };
+
+  return folders[view] || folders.received;
+}
+
+function createFolderNav(view) {
+  const folderItems = [
+    ["received", "Recue", receivedPhotos.length],
+    ["send", "Envoyer", sentPhotos.length],
+    ["trash", "Corbeille", deletedPhotos.length],
+    ["photo", "Photo", photos.length]
+  ];
+
+  return `
+    <div class="mailbox-brand">
+      <strong>PhotoCours</strong>
+      <span>${localStorage.getItem(SESSION_KEY) || "non connecte"}</span>
+    </div>
+    <nav class="mailbox-nav" aria-label="Dossiers PhotoCours">
+      ${folderItems.map(([key, label, count]) => `
+        <button class="mailbox-nav-item ${view === key ? "is-active" : ""}" type="button" data-folder="${key}">
+          <span>${label}</span>
+          <strong>${count}</strong>
+        </button>
+      `).join("")}
+    </nav>
+  `;
+}
+
+function getCurrentDisplayPseudo() {
+  return getCurrentPseudo() || "moi";
+}
+
+function getPhotoSender(photo, view) {
+  if (photo.sender) return photo.sender;
+  if (view === "send") return getSenderName();
+  return "inconnu";
+}
+
+function getPhotoRecipient(photo, view) {
+  if (photo.recipient) return photo.recipient;
+  if (photo.recipientPseudo) return photo.recipientPseudo;
+  if (view === "received") return getCurrentDisplayPseudo();
+  return "inconnu";
+}
+
+function createMailboxRows(items, label, view) {
+  if (!items.length) {
+    return `<p class="folder-empty">Aucune photo dans ce dossier.</p>`;
+  }
+
+  return items.map((photo, index) => {
+    const course = photo.course || courseInput.value.trim() || `Photo ${index + 1}`;
+    const sender = getPhotoSender(photo, view);
+    const recipient = getPhotoRecipient(photo, view);
+    const date = photo.deliveredAt || photo.sentAt || photo.deletedAt || "";
+    const dateLabel = date ? new Date(date).toLocaleDateString("fr-FR") : "aujourd'hui";
+
+    return `
+      <button class="mailbox-row ${index === 0 ? "is-selected" : ""}" type="button" data-photo-src="${photo.dataUrl}">
+        <img src="${photo.dataUrl}" alt="${label} ${index + 1}">
+        <span class="mailbox-row-main">
+          <strong>${course}</strong>
+          <small>De : ${sender} - A : ${recipient}</small>
+        </span>
+        <span class="mailbox-row-meta">
+          <strong>${formatBytes(photo.size)}</strong>
+          <small>${dateLabel}</small>
+        </span>
+      </button>
+    `;
+  }).join("");
+}
+
+function createFolderPreview(info, view) {
+  const firstPhoto = info.items[0];
+
+  if (!firstPhoto) {
+    return `
+      <aside class="folder-preview">
+        <h3>Aperçu</h3>
+        <p>Selectionnez une photo pour la voir ici.</p>
+      </aside>
+    `;
+  }
+
+  const sender = getPhotoSender(firstPhoto, view);
+  const recipient = getPhotoRecipient(firstPhoto, view);
+
+  return `
+    <aside class="folder-preview">
+      <h3>${firstPhoto.course || info.title}</h3>
+      <button class="folder-preview-photo" type="button" data-photo-src="${firstPhoto.dataUrl}">
+        <img src="${firstPhoto.dataUrl}" alt="${info.label}">
+      </button>
+      <dl>
+        <div><dt>Taille</dt><dd>${formatBytes(firstPhoto.size)}</dd></div>
+        <div><dt>De</dt><dd>${sender}</dd></div>
+        <div><dt>A</dt><dd>${recipient}</dd></div>
+      </dl>
+      <p>${firstPhoto.message || "Aucun message."}</p>
+    </aside>
+  `;
+}
+
+function openFolderView(view) {
+  const info = getFolderInfo(view);
   activeFolderView = view;
 
   folderView.hidden = false;
   document.body.classList.add("is-folder-open");
-
-  if (view === "received") {
-    folderSide.innerHTML = `
-      <button class="folder-tab is-active" type="button">recue</button>
-    `;
-    folderContent.innerHTML = `
-      <button class="folder-tab" type="button">photos recues</button>
-      <div class="folder-card-row">
-        ${createPhotoCards(receivedPhotos, "photo recue")}
-      </div>
-    `;
-    return;
-  }
-
-  if (view === "send") {
-    folderSide.innerHTML = `
-      <button class="folder-tab is-active" type="button">envoyer</button>
-      <p class="folder-recipient">photos envoyees</p>
-    `;
-    folderContent.innerHTML = `
-      <div class="folder-card-row">
-        ${createPhotoCards(sentPhotos, `photo de ${displayName}`)}
-      </div>
-    `;
-    return;
-  }
-
-  if (view === "trash") {
-    folderSide.innerHTML = `
-      <button class="folder-tab is-active" type="button">photo supprimer</button>
-    `;
-    folderContent.innerHTML = `
-      <div class="folder-card-row">
-        ${createPhotoCards(deletedPhotos, "photo supprimer")}
-      </div>
-    `;
-    return;
-  }
-
-  folderSide.innerHTML = `
-    <button class="folder-tab is-active" type="button">photo</button>
-  `;
+  folderSide.innerHTML = createFolderNav(view);
   folderContent.innerHTML = `
-    <div class="folder-card-row folder-card-grid">
-      ${createPhotoCards(photos, "photo non supprimer")}
-    </div>
+    <section class="mailbox-list">
+      <header class="mailbox-header">
+        <div>
+          <h2>${info.title}</h2>
+          <p>${info.subtitle}</p>
+        </div>
+        <strong>${info.items.length} photo${info.items.length > 1 ? "s" : ""}</strong>
+      </header>
+      <div class="mailbox-rows">
+        ${createMailboxRows(info.items, info.label, view)}
+      </div>
+    </section>
+    ${createFolderPreview(info, view)}
   `;
 }
 
@@ -723,11 +824,21 @@ printPhotoButton.addEventListener("click", printPhoto);
 sendForm.addEventListener("submit", sendEmail);
 fileInput.addEventListener("change", handleFile);
 folderContent.addEventListener("click", (event) => {
-  const card = event.target.closest(".folder-photo-card");
+  const card = event.target.closest(".folder-photo-card, .mailbox-row, .folder-preview-photo");
   if (!card) return;
   openPhotoDialog(card.dataset.photoSrc);
 });
 closePhotoDialogButton.addEventListener("click", closePhotoDialog);
+
+folderSide.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-folder]");
+  if (!button) return;
+
+  openFolderView(button.dataset.folder);
+  if (button.dataset.folder === "received") {
+    loadReceivedPhotosFromServer();
+  }
+});
 
 quickReceivedButton.addEventListener("click", () => {
   openFolderView("received");

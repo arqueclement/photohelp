@@ -1,4 +1,4 @@
-const CACHE_NAME = "photocours-app-v20";
+const CACHE_NAME = "photocours-app-v22";
 const APP_FILES = [
   "/",
   "/index.html",

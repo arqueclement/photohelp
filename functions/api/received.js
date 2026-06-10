@@ -16,7 +16,7 @@ export async function onRequestGet({ request, env }) {
   }
 
   const result = await env.DB.prepare(`
-    SELECT id, sender_name AS sender, sender_email AS senderEmail, course, message,
+    SELECT id, recipient_pseudo AS recipient, sender_name AS sender, sender_email AS senderEmail, course, message,
            file_name AS fileName, mime_type AS mimeType, size, data_url AS dataUrl,
            created_at AS deliveredAt
     FROM photos
