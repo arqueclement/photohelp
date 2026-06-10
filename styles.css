@@ -106,6 +106,7 @@ body.is-folder-open .login-open {
 }
 
 .quick-action {
+  position: relative;
   min-width: 6.4rem;
   min-height: 2.45rem;
   border: 1px solid rgba(31, 122, 90, 0.22);
@@ -116,6 +117,25 @@ body.is-folder-open .login-open {
   cursor: pointer;
   font-weight: 800;
   text-transform: lowercase;
+}
+
+.quick-badge {
+  position: absolute;
+  top: -0.45rem;
+  right: -0.45rem;
+  display: grid;
+  place-items: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  padding: 0 0.28rem;
+  color: #fff;
+  background: #e11d2e;
+  box-shadow: 0 5px 12px rgba(120, 20, 20, 0.25);
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .quick-action:hover,

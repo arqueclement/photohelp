@@ -46,6 +46,7 @@ const siteNoticeTitle = document.querySelector("#siteNoticeTitle");
 const siteNoticeText = document.querySelector("#siteNoticeText");
 const siteNoticeOpenButton = document.querySelector("#siteNoticeOpen");
 const siteNoticeCloseButton = document.querySelector("#siteNoticeClose");
+const quickBadges = document.querySelectorAll("[data-badge]");
 
 const MAX_TOTAL_BYTES = 18 * 1024 * 1024;
 const SERVER_SEND_LIMIT_BYTES = 5 * 1024 * 1024;
@@ -66,6 +67,21 @@ let siteNoticeFolder = "received";
 
 function setStatus(message) {
   statusMessage.textContent = message;
+}
+
+function setQuickBadge(name, count) {
+  const badge = document.querySelector(`[data-badge="${name}"]`);
+  if (!badge) return;
+
+  badge.textContent = count > 99 ? "99+" : String(count);
+  badge.hidden = count <= 0;
+}
+
+function updateQuickBadges() {
+  setQuickBadge("received", receivedPhotos.length);
+  setQuickBadge("send", getVisibleSentPhotos().length);
+  setQuickBadge("trash", deletedPhotos.length);
+  setQuickBadge("photo", photos.length);
 }
 
 function getAccounts() {
@@ -380,6 +396,7 @@ function addPhoto(dataUrl, fileName = "") {
     size
   });
   renderPhotos();
+  updateQuickBadges();
   setStatus(`${photos.length} photo${photos.length > 1 ? "s" : ""} ajoutee${photos.length > 1 ? "s" : ""}. Total: ${formatBytes(getTotalBytes())}. Reste: ${formatBytes(getRemainingBytes())}.`);
   stopCamera();
   return true;
@@ -393,6 +410,7 @@ function clearPhotos() {
   photos = [];
   stopCamera();
   renderPhotos();
+  updateQuickBadges();
   setStatus("Photos envoyees dans la corbeille.");
   openFolderView("trash");
 }
@@ -406,6 +424,7 @@ function rememberSentPhotos(recipient) {
     ...photos.map((photo) => ({ ...photo, sender: getSenderName(), senderEmail, recipient, sentAt })),
     ...sentPhotos
   ];
+  updateQuickBadges();
 }
 
 function getDisplayName() {
@@ -484,6 +503,7 @@ function handleReceivedCount(newCount) {
   const oldCount = storedCount === null ? newCount : Number(storedCount);
 
   updateAppBadge(newCount);
+  updateQuickBadges();
   localStorage.setItem(key, String(newCount));
 
   if (storedCount !== null && newCount > oldCount) {
@@ -504,6 +524,7 @@ async function loadReceivedPhotosFromServer() {
   if (!pseudo) {
     receivedPhotos = [];
     updateAppBadge(0);
+    updateQuickBadges();
     return;
   }
 
@@ -514,6 +535,7 @@ async function loadReceivedPhotosFromServer() {
     const result = await response.json();
     receivedPhotos = result.photos || [];
     handleReceivedCount(receivedPhotos.length);
+    updateQuickBadges();
     if (activeFolderView === "received") {
       openFolderView("received");
     }
@@ -545,6 +567,7 @@ async function loadTrashPhotosFromServer() {
     const result = await response.json();
     const localPhotos = deletedPhotos.filter((photo) => !photo.id);
     deletedPhotos = [...(result.photos || []), ...localPhotos];
+    updateQuickBadges();
     if (activeFolderView === "trash") {
       openFolderView("trash");
     }
@@ -833,6 +856,61 @@ function closePrintPicker() {
   printPickerDialog.removeAttribute("open");
 }
 
+function getA4PrintHtml(items, title = "Impression PhotoCours") {
+  return `
+    <!doctype html>
+    <html lang="fr">
+      <head>
+        <title>${title}</title>
+        <style>
+          @page { size: A4 portrait; margin: 0; }
+          * { box-sizing: border-box; }
+          html, body { margin: 0; background: #fff; }
+          .sheet {
+            display: grid;
+            place-items: center;
+            width: 210mm;
+            height: 297mm;
+            page-break-after: always;
+            break-after: page;
+            overflow: hidden;
+            background: #fff;
+          }
+          .sheet:last-child {
+            page-break-after: auto;
+            break-after: auto;
+          }
+          img {
+            display: block;
+            max-width: 210mm;
+            max-height: 297mm;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+          }
+          @media screen {
+            body { background: #e8edf4; }
+            .sheet {
+              margin: 16px auto;
+              box-shadow: 0 12px 35px rgba(31, 42, 68, 0.18);
+            }
+          }
+        </style>
+      </head>
+      <body>
+        ${items.map((photo, index) => `
+          <section class="sheet">
+            <img src="${photo.dataUrl}" alt="Photo ${index + 1}">
+          </section>
+        `).join("")}
+        <script>
+          window.onload = () => window.print();
+        <\/script>
+      </body>
+    </html>
+  `;
+}
+
 function printSelectedFolderPhotos() {
   const selectedIndexes = Array.from(printPickerList.querySelectorAll("input:checked"))
     .map((input) => Number(input.value));
@@ -850,24 +928,7 @@ function printSelectedFolderPhotos() {
     return;
   }
 
-  printWindow.document.write(`
-    <!doctype html>
-    <html lang="fr">
-      <head>
-        <title>Impression PhotoCours</title>
-        <style>
-          body { margin: 0; }
-          img { display: block; max-width: 100%; max-height: 100vh; margin: 0 auto; object-fit: contain; page-break-after: always; }
-        </style>
-      </head>
-      <body>
-        ${selectedPhotos.map((photo, index) => `<img src="${photo.dataUrl}" alt="Photo ${index + 1}">`).join("")}
-        <script>
-          window.onload = () => window.print();
-        <\/script>
-      </body>
-    </html>
-  `);
+  printWindow.document.write(getA4PrintHtml(selectedPhotos));
   printWindow.document.close();
   closePrintPicker();
 }
@@ -928,6 +989,7 @@ async function deletePhotoAt(view, index) {
     renderPhotos();
   }
 
+  updateQuickBadges();
   setStatus(view === "trash" ? "Photo supprimee definitivement." : "Photo mise dans la corbeille.");
   openFolderView(view);
 }
@@ -1103,24 +1165,7 @@ function printPhoto() {
     return;
   }
 
-  printWindow.document.write(`
-    <!doctype html>
-    <html lang="fr">
-      <head>
-        <title>Impression du cours</title>
-        <style>
-          body { margin: 0; }
-          img { display: block; max-width: 100%; max-height: 100vh; margin: 0 auto; object-fit: contain; page-break-after: always; }
-        </style>
-      </head>
-      <body>
-        ${photos.map((photo, index) => `<img src="${photo.dataUrl}" alt="Photo du cours ${index + 1}">`).join("")}
-        <script>
-          window.onload = () => window.print();
-        <\/script>
-      </body>
-    </html>
-  `);
+  printWindow.document.write(getA4PrintHtml(photos, "Impression du cours"));
   printWindow.document.close();
 }
 
@@ -1292,6 +1337,7 @@ loginForm.addEventListener("submit", handleLogin);
 loadConnectedEmail();
 loadReceivedPhotosFromServer();
 loadTrashPhotosFromServer();
+updateQuickBadges();
 
 if (!navigator.mediaDevices?.getUserMedia) {
   startCameraButton.disabled = true;
